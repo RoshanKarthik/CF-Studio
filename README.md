@@ -47,18 +47,35 @@ Restart the browser after installing. `cfstudio-runner uninstall` removes the re
 -static`, 256 MB stack, `LOCAL` defined) and judges with the problem's CPU-time and memory limits
 inside a Windows Job Object, with no console windows.
 
+## Submitting
+
+**Submit** (`Ctrl+Enter`) opens a confirmation with warnings (failing or stale samples, `freopen`,
+a Java `package` line, an unchanged template). Only after you confirm does the content script post
+Codeforces' own submit form from the problem page, in your own logged-in session: it reads the
+form (CSRF token included) from the contest, problemset or gym submit page and picks the newest
+matching compiler from the form's language list (G++20, Java 21, the newest Python 3 / PyPy 3).
+CF Studio never handles your password; if you're logged out it says so and links to the login
+page, and a Cloudflare browser check is left for you to complete on Codeforces. Codeforces' own
+errors (same code submitted before, contest not running, …) are shown in the dialog.
+
+After a submit the top bar shows the live verdict — in queue, running on test N, then the verdict
+with time and memory, linked to the submission — read from Codeforces' official API
+(`user.status`) at most once every two seconds, and only while the IDE is open. The
+**Submissions** tab next to **Description** lists your submissions for the problem.
+
 ## Working on the UI
 
 ```bash
 cd extension
 npm install
 npm run dev        # preview page with a sample problem at http://127.0.0.1:5173
-npm test           # parser, checker and template tests
+npm test           # parser, checker, template and submit tests
 npm run build      # type-check + build the extension into dist/
 ```
 
-The preview page uses a sample problem written in Codeforces' statement markup and a **simulated**
-runner (the first test passes, the rest fail, so every verdict view can be seen).
+The preview page uses a sample problem written in Codeforces' statement markup, a **simulated**
+runner (the first test passes, the rest fail, so every verdict view can be seen) and a simulated
+judge (a submission queues, runs a few tests and is accepted; nothing is sent to Codeforces).
 
 ## Shortcuts
 

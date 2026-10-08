@@ -65,8 +65,26 @@ Competitive programming only. No hints, editorials, discussions or AI features.
      `NativeRunner` in `src/extension/nativeRunner.ts`
    - Tests: `go test ./...` runs real C++/Java/Python programs (AC, CE, TLE, MLE, deep
      recursion, RE)
-4. **Submit and verdict** — submit through Codeforces' own form in the user's session (CSRF
-   token from the page), then poll `user.status` and show the live verdict in the IDE;
-   per-problem submission list
+4. **Submit and verdict** — done
+   - Submitting is done by the content script, so the user's own session cookies apply: it fetches
+     the submit page (`/contest/<id>/submit`, `/problemset/submit` for problems opened from the
+     problemset, `/gym/<id>/submit`), reads the form (`src/core/submit.ts`: fields incl. CSRF
+     token, language options, problem list) and posts it back with problem, `programTypeId` and
+     source filled in. Only sent after the user confirms in the IDE's dialog (`cfs:submit`)
+   - Language mapping by option label, not fixed ids: exactly G++20 first (then newer standards,
+     never clang), Java 21 (else newest Java), newest Python 3, newest PyPy 3
+   - Errors in the dialog: not logged in (with a login link the IDE builds itself), Codeforces'
+     field errors (e.g. same code before), its notices (`Codeforces.showMessage`), a Cloudflare
+     browser check (reported, never worked around)
+   - Live verdict: polls `user.status` (handle from the page header) every 2.5 s; the content
+     script keeps API calls at least 2 s apart; finds the new submission by the id on the
+     redirect page (else newest since the submit); stops on a final verdict, after 15 min, or when
+     the IDE unloads, and pauses while the IDE is hidden (`cfs:visible`)
+   - Submissions tab: the user's submissions for the problem (latest 1000 from `user.status`,
+     filtered in the content script, validated again in the IDE by `parseUserStatus`)
+   - Preview page: `SimulatedJudge` (queue → tests → Accepted, nothing sent)
+   - Not yet checked against a logged-in live submit form or a real submission: form fields and
+     language labels follow Codeforces' known markup and a self-written fixture
+     (`tests/fixtures/submit-form.html`); check both on first real use
 5. **Extras** — stress testing (brute force + generator), contest mode (problem tabs, countdown),
    interactive problems, solutions mirrored to disk

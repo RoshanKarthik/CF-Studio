@@ -1,5 +1,6 @@
-import { AlertTriangle, CheckCircle2, Send } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, LogIn, Send, XCircle } from 'lucide-react';
 import { useState } from 'react';
+import { SubmitError } from '../core/judge';
 import type { Problem } from '../core/types';
 import { Kbd, Modal } from './primitives';
 
@@ -15,22 +16,32 @@ export function SubmitDialog({
   problem,
   languageLabel,
   check,
+  loginUrl,
   onCancel,
   onConfirm,
 }: {
   problem: Problem;
   languageLabel: string;
   check: SubmitCheck;
+  loginUrl: string | null;
   onCancel: () => void;
+  /** Rejects with the reason Codeforces gave; the dialog shows it and stays open. */
   onConfirm: () => Promise<void>;
 }) {
   const [sending, setSending] = useState(false);
+  const [error, setError] = useState<{ message: string; login: boolean } | null>(null);
   const allPass = check.upToDate && check.samplesPassed === check.samplesTotal;
 
   const confirm = async () => {
     setSending(true);
+    setError(null);
     try {
       await onConfirm();
+    } catch (e) {
+      setError({
+        message: e instanceof Error && e.message ? e.message : 'The submission failed.',
+        login: e instanceof SubmitError && e.login,
+      });
     } finally {
       setSending(false);
     }
@@ -46,7 +57,7 @@ export function SubmitDialog({
             Cancel
           </button>
           <button className="btn primary" onClick={confirm} disabled={sending} autoFocus>
-            <Send size={14} /> {sending ? 'Submitting…' : 'Submit'} <Kbd>Enter</Kbd>
+            <Send size={14} /> {sending ? 'Submitting…' : error ? 'Try again' : 'Submit'} <Kbd>Enter</Kbd>
           </button>
         </>
       }
@@ -76,6 +87,22 @@ export function SubmitDialog({
             </li>
           ))}
         </ul>
+      )}
+      {error && (
+        <div className="submit-error" role="alert">
+          <XCircle size={15} />
+          <div>
+            <b>Not submitted.</b> {error.message}
+            {error.login && loginUrl && (
+              <div>
+                <a href={loginUrl} target="_blank" rel="noopener noreferrer">
+                  <LogIn size={13} /> Log in to Codeforces
+                </a>{' '}
+                <span className="muted">(then come back and submit again)</span>
+              </div>
+            )}
+          </div>
+        </div>
       )}
     </Modal>
   );

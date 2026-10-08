@@ -1,4 +1,5 @@
 import { Check, Clock, Copy, ExternalLink, Eye, EyeOff, FileInput, HardDrive, PanelLeftClose, Radio } from 'lucide-react';
+import type { ReactNode } from 'react';
 import { useMemo, useState } from 'react';
 import type { Problem } from '../core/types';
 import { renderTex } from './tex';
@@ -41,11 +42,17 @@ export function ProblemPanel({
   problem,
   showTags,
   onCollapse,
+  submissions,
+  onOpenSubmissions,
 }: {
   problem: Problem;
   showTags: boolean;
   onCollapse: () => void;
+  /** Content of the Submissions tab. */
+  submissions: ReactNode;
+  onOpenSubmissions: () => void;
 }) {
+  const [tab, setTab] = useState<'statement' | 'submissions'>('statement');
   const [reveal, setReveal] = useState(showTags);
   const tagsVisible = showTags || reveal;
   const fileIO = problem.inputFile !== 'standard input' || problem.outputFile !== 'standard output';
@@ -54,7 +61,18 @@ export function ProblemPanel({
     <div className="pane problem-pane">
       <div className="pane-head">
         <div className="tabs">
-          <button className="tab active">Description</button>
+          <button className={`tab ${tab === 'statement' ? 'active' : ''}`} onClick={() => setTab('statement')}>
+            Description
+          </button>
+          <button
+            className={`tab ${tab === 'submissions' ? 'active' : ''}`}
+            onClick={() => {
+              setTab('submissions');
+              onOpenSubmissions();
+            }}
+          >
+            Submissions
+          </button>
         </div>
         <div className="pane-actions">
           <a className="icon-btn" href={problem.url} target="_blank" rel="noopener noreferrer" title="Open on Codeforces">
@@ -66,7 +84,8 @@ export function ProblemPanel({
         </div>
       </div>
 
-      <div className="pane-scroll statement">
+      {tab === 'submissions' && submissions}
+      <div className="pane-scroll statement" hidden={tab !== 'statement'}>
         <h1 className="st-title">{problem.title}</h1>
         <div className="st-meta">
           <span className="chip">

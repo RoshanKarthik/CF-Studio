@@ -4,7 +4,8 @@
  * to the classic page. Alt+I toggles between the two.
  */
 import { parseProblemUrl } from '../core/parseProblem';
-import type { IdeMessage, InitMessage } from './messages';
+import * as codeforces from './codeforces';
+import type { IdeMessage, InitMessage, PageMessage } from './messages';
 import { statementHtml } from './scrape';
 
 const LAUNCHER_CSS = `
@@ -60,6 +61,11 @@ function main() {
 
   const ideUrl = chrome.runtime.getURL('ide.html');
   const ideOrigin = new URL(ideUrl).origin;
+  const page: codeforces.PageProblem = {
+    kind: ref.kind,
+    contestId: ref.contestId,
+    problemset: location.pathname.startsWith('/problemset/'),
+  };
   let frame: HTMLIFrameElement | null = null;
   let isOpen = false;
   let pageOverflow = '';
@@ -86,6 +92,7 @@ function main() {
     if (isOpen) return;
     isOpen = true;
     frame.style.display = 'block';
+    post({ type: 'cfs:visible', visible: true });
     pageOverflow = document.documentElement.style.overflow;
     document.documentElement.style.overflow = 'hidden';
     launcher.hide();
@@ -96,17 +103,39 @@ function main() {
     if (!frame || !isOpen) return;
     isOpen = false;
     frame.style.display = 'none';
+    post({ type: 'cfs:visible', visible: false });
     document.documentElement.style.overflow = pageOverflow;
     launcher.show();
   }
 
+  function post(msg: PageMessage) {
+    frame?.contentWindow?.postMessage(msg, ideOrigin);
+  }
+
+  const failed = (e: unknown) => (e instanceof Error && e.message ? e.message : 'Network error');
+
   window.addEventListener('message', (e: MessageEvent<IdeMessage>) => {
     if (!frame || e.source !== frame.contentWindow || e.origin !== ideOrigin) return;
-    if (e.data?.type === 'cfs:ready') {
+    const data = e.data;
+    if (data?.type === 'cfs:ready') {
       const msg: InitMessage = { type: 'cfs:init', url: location.href, html, index: ref.index };
-      frame.contentWindow!.postMessage(msg, ideOrigin);
-    } else if (e.data?.type === 'cfs:close') {
+      post(msg);
+    } else if (data?.type === 'cfs:close') {
       close();
+    } else if (data?.type === 'cfs:submit') {
+      // Only the IDE sends this, after the user confirmed in its submit dialog.
+      const { id, index, lang, code } = data;
+      void codeforces
+        .submit(page, index, lang, code)
+        .catch((err: unknown) => ({ ok: false as const, login: false, message: `Couldn't reach Codeforces: ${failed(err)}` }))
+        .then((r) => post({ type: 'cfs:submit-result', id, ...r }));
+    } else if (data?.type === 'cfs:status') {
+      const { id, index, count } = data;
+      if (typeof index !== 'string' || !/^[A-Z0-9]{1,4}$/.test(index)) return;
+      void codeforces
+        .status(page, index, count)
+        .catch((err: unknown) => ({ ok: false as const, message: `Couldn't reach the Codeforces API: ${failed(err)}` }))
+        .then((r) => post({ type: 'cfs:status-result', id, ...r }));
     }
   });
 

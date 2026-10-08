@@ -1,5 +1,6 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
+import { SimulatedJudge } from '../core/judge';
 import { parseProblemPage } from '../core/parseProblem';
 import { SimulatedRunner } from '../core/runner';
 import { LocalStorageKV } from '../core/storage';
@@ -10,8 +11,8 @@ import '../ui/styles.css';
 import fixture from './fixture.html?raw';
 
 // The preview renders the IDE outside Codeforces: a fixture problem in Codeforces' own markup,
-// browser storage, and a simulated runner. The extension swaps in the real page, chrome.storage
-// and the Go runner.
+// browser storage, a simulated runner and a simulated judge. The extension swaps in the real page,
+// chrome.storage, the Go runner and submitting through the Codeforces page.
 const url = 'https://codeforces.com/contest/2001/problem/A';
 const [problem] = parseProblemPage(new DOMParser().parseFromString(fixture, 'text/html'), url);
 const runner = new SimulatedRunner(new Map(problem.samples.map((s) => [s.input, s.output])));
@@ -26,7 +27,7 @@ void loadInitialState(kv, problem).then((initial) => {
         runner={runner}
         kv={kv}
         initial={initial}
-        submit={async () => 'Preview mode — nothing was sent to Codeforces'}
+        judge={new SimulatedJudge()}
       />
     </StrictMode>,
   );

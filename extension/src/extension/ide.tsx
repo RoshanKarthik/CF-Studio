@@ -8,9 +8,10 @@ import { loadInitialState } from '../ui/state';
 import { applyTheme } from '../ui/themes';
 import '../ui/styles.css';
 import { ChromeStorageKV } from './chromeKV';
-import type { IdeMessage, InitMessage } from './messages';
+import type { IdeMessage, PageMessage } from './messages';
 import { isCodeforcesOrigin } from './messages';
 import { NativeRunner } from './nativeRunner';
+import { PageJudge } from './pageJudge';
 
 const kv = new ChromeStorageKV();
 const parentOrigin = location.ancestorOrigins?.[0] ?? '';
@@ -20,6 +21,8 @@ const runner = new NativeRunner();
 function send(msg: IdeMessage) {
   window.parent.postMessage(msg, parentOrigin);
 }
+
+const judge = new PageJudge(parentOrigin, send);
 
 function Boot({ text }: { text: string }) {
   return <div className="boot">{text}</div>;
@@ -60,9 +63,7 @@ function IdeRoot({ problems, startIndex }: { problems: Problem[]; startIndex: st
       runner={runner}
       kv={kv}
       initial={loaded.state}
-      submit={async () => {
-        throw new Error('Submitting from CF Studio is coming soon. For now, use the Submit page on Codeforces.');
-      }}
+      judge={judge}
       onExit={() => send({ type: 'cfs:close' })}
       nav={nav}
     />
@@ -76,8 +77,13 @@ if (!isCodeforcesOrigin(parentOrigin)) {
 } else {
   root.render(<Boot text="Loading…" />);
   let started = false;
-  window.addEventListener('message', (e: MessageEvent<InitMessage>) => {
-    if (started || e.source !== window.parent || e.origin !== parentOrigin || e.data?.type !== 'cfs:init') return;
+  window.addEventListener('message', (e: MessageEvent<PageMessage>) => {
+    if (e.source !== window.parent || e.origin !== parentOrigin || typeof e.data?.type !== 'string') return;
+    if (e.data.type !== 'cfs:init') {
+      judge.handle(e.data);
+      return;
+    }
+    if (started) return;
     const { url, html, index } = e.data;
     if (typeof url !== 'string' || typeof html !== 'string' || new URL(url).origin !== parentOrigin) return;
     started = true;

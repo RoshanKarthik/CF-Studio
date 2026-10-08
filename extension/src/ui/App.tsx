@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { checkOptionsFor, judge } from '../core/checker';
+import type { Judge } from '../core/judge';
 import type { Family, LangId } from '../core/languages';
 import { FAMILY_LABEL, LANGUAGES, language } from '../core/languages';
 import type { Runner, RunnerStatus } from '../core/runner';
@@ -32,11 +33,13 @@ import { SettingsDialog } from './SettingsDialog';
 import type { InitialState, Layout, Settings, TimerState } from './state';
 import type { SubmitCheck } from './SubmitDialog';
 import { SubmitDialog } from './SubmitDialog';
+import { LiveVerdict, SubmissionsPanel } from './SubmissionsPanel';
 import type { CaseSpec, CompileInfo, TestTab } from './TestPanel';
 import { TestPanel, summary } from './TestPanel';
 import { TemplateManager } from './TemplateManager';
 import { applyTheme } from './themes';
 import { Timer, startTimer } from './Timer';
+import { useSubmissions } from './useSubmissions';
 
 const EXT: Record<Family, string> = { cpp: 'cpp', java: 'java', py: 'py' };
 const FILE_NAME: Record<Family, string> = { cpp: 'main.cpp', java: 'Main.java', py: 'main.py' };
@@ -46,8 +49,8 @@ export interface AppProps {
   runner: Runner;
   kv: KV;
   initial: InitialState;
-  /** Send the code to Codeforces; resolves with a message to show, rejects on failure. */
-  submit: (lang: LangId, code: string) => Promise<string>;
+  /** Submits to Codeforces and reads the user's submissions. */
+  judge: Judge;
   /** Close the IDE and show the Codeforces page (extension only). */
   onExit?: () => void;
   /** Other problems of the same contest, when the page had several. */
@@ -83,7 +86,7 @@ function Logo() {
   );
 }
 
-export function App({ problem, runner, kv, initial, submit, onExit, nav }: AppProps) {
+export function App({ problem, runner, kv, initial, judge: cf, onExit, nav }: AppProps) {
   const [settings, setSettings] = useState<Settings>(initial.settings);
   const [layout, setLayout] = useState<Layout>(initial.layout);
   const [templates, setTemplates] = useState<TemplateStore>(initial.templates);
@@ -241,14 +244,14 @@ export function App({ problem, runner, kv, initial, submit, onExit, nav }: AppPr
     return { samplesPassed: sum?.passed ?? 0, samplesTotal: sampleCases.length, upToDate: Boolean(upToDate && sum), warnings };
   }, [lastRun, code, settings.lang, sampleCases, results, family, problem.inputFile, templates]);
 
+  const submissions = useSubmissions(cf, problem);
+
+  // Errors are shown in the dialog (with a login link when needed), so it stays open.
   const doSubmit = async () => {
-    try {
-      const message = await submit(settings.lang, code);
-      push('ok', message);
-      setDialog(null);
-    } catch (e) {
-      push('error', e instanceof Error ? e.message : 'Submission failed');
-    }
+    const sent = await cf.submit(problem, settings.lang, code);
+    setDialog(null);
+    push('ok', 'Submitted — waiting for the verdict');
+    submissions.track(sent);
   };
 
   // --- editor actions --------------------------------------------------------------------
@@ -371,6 +374,7 @@ export function App({ problem, runner, kv, initial, submit, onExit, nav }: AppPr
 
         <div className="topbar-center">
           <Timer state={timer} onChange={setTimer} />
+          {submissions.live && <LiveVerdict live={submissions.live} judge={cf} onDismiss={submissions.dismiss} />}
         </div>
 
         <div className="topbar-right">
@@ -415,6 +419,16 @@ export function App({ problem, runner, kv, initial, submit, onExit, nav }: AppPr
                 problem={problem}
                 showTags={settings.showTags}
                 onCollapse={() => setLayout((l) => ({ ...l, statementOpen: false }))}
+                onOpenSubmissions={() => submissions.list.status === 'idle' && void submissions.load()}
+                submissions={
+                  <SubmissionsPanel
+                    state={submissions.list}
+                    judge={cf}
+                    loginUrl={cf.loginUrl(problem)}
+                    liveId={submissions.live?.sub?.id ?? null}
+                    onRefresh={() => void submissions.load()}
+                  />
+                }
               />
             </div>
             <Splitter direction="row" min={22} max={70} onResize={(left) => setLayout((l) => ({ ...l, left }))} />
@@ -597,6 +611,7 @@ export function App({ problem, runner, kv, initial, submit, onExit, nav }: AppPr
           problem={problem}
           languageLabel={lang.label}
           check={submitCheck}
+          loginUrl={cf.loginUrl(problem)}
           onCancel={() => setDialog(null)}
           onConfirm={doSubmit}
         />
