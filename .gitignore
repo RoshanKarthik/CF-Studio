@@ -1,0 +1,6 @@
+# runner build output
+runner/bin/
+*.exe
+
+# local tool config
+.claude/

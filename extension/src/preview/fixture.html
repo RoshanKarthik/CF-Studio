@@ -1,0 +1,78 @@
+<!-- An original problem written in Codeforces' statement markup, for the preview page and tests. -->
+<!doctype html>
+<html>
+<body>
+<div id="body">
+  <div id="sidebar">
+    <div class="roundbox sidebox">
+      <div class="caption titled">→ Problem tags</div>
+      <span class="tag-box" title="greedy">greedy</span>
+      <span class="tag-box" title="math">math</span>
+      <span class="tag-box" title="Difficulty">*1200</span>
+    </div>
+  </div>
+  <div class="problemindexholder" problemindex="A">
+    <div class="ttypography">
+      <div class="problem-statement">
+        <div class="header">
+          <div class="title">A. Balanced Stones</div>
+          <div class="time-limit"><div class="property-title">time limit per test</div>1 second</div>
+          <div class="memory-limit"><div class="property-title">memory limit per test</div>256 megabytes</div>
+          <div class="input-file"><div class="property-title">input</div>standard input</div>
+          <div class="output-file"><div class="property-title">output</div>standard output</div>
+        </div>
+        <div>
+          <p>There are $$$n$$$ piles of stones in a row, the $$$i$$$-th pile contains $$$a_i$$$ stones.</p>
+          <p>In one operation you may take one stone from a pile and put it on an <b>adjacent</b> pile.
+          Find the minimum number of operations needed to make all piles equal, or report that it is
+          impossible.</p>
+          <script>window.__fixtureScriptRan = true;</script>
+        </div>
+        <div class="input-specification">
+          <div class="section-title">Input</div>
+          <p>The first line contains a single integer $$$t$$$ ($$$1 \le t \le 10^4$$$) — the number of test cases.</p>
+          <p>The first line of each test case contains an integer $$$n$$$ ($$$1 \le n \le 2 \cdot 10^5$$$).
+          The second line contains $$$n$$$ integers $$$a_1, a_2, \ldots, a_n$$$ ($$$0 \le a_i \le 10^9$$$).</p>
+          <p>It is guaranteed that the sum of $$$n$$$ over all test cases does not exceed $$$2 \cdot 10^5$$$.</p>
+        </div>
+        <div class="output-specification">
+          <div class="section-title">Output</div>
+          <p>For each test case, print a single integer — the minimum number of operations, or $$$-1$$$ if
+          the piles can never be made equal.</p>
+        </div>
+        <div class="sample-tests">
+          <div class="section-title">Examples</div>
+          <div class="sample-test">
+            <div class="input">
+              <div class="title">Input</div>
+              <pre><div class="test-example-line test-example-line-even test-example-line-0">3</div><div class="test-example-line test-example-line-odd test-example-line-1">3</div><div class="test-example-line test-example-line-odd test-example-line-1">1 2 3</div><div class="test-example-line test-example-line-even test-example-line-2">2</div><div class="test-example-line test-example-line-even test-example-line-2">1 2</div><div class="test-example-line test-example-line-odd test-example-line-3">4</div><div class="test-example-line test-example-line-odd test-example-line-3">4 0 0 4</div></pre>
+            </div>
+            <div class="output">
+              <div class="title">Output</div>
+              <pre>2
+-1
+4
+</pre>
+            </div>
+            <div class="input">
+              <div class="title">Input</div>
+              <pre>1<br />5<br />0 0 10 0 0<br /></pre>
+            </div>
+            <div class="output">
+              <div class="title">Output</div>
+              <pre>12</pre>
+            </div>
+          </div>
+        </div>
+        <div class="note">
+          <div class="section-title">Note</div>
+          <p>In the first test case, move a stone from the third pile to the second, then from the second
+          pile to the first: $$$[1, 2, 3] \to [1, 3, 2] \to [2, 2, 2]$$$.</p>
+          <p>In the second test case the total of $$$3$$$ stones can't be split equally between $$$2$$$ piles.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>
