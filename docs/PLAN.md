@@ -123,8 +123,10 @@ Competitive programming only. No hints, editorials, discussions or AI features.
      "Running on Codeforces (runner not installed)" (amber). Stress tests, interactors and saving
      to disk say they need the runner
    - Protocol read from the user's saved copy of the logged-in page (the built-in browser can't pass
-     Codeforces' Cloudflare check); not yet run live — the verdict strings for errors are guessed
-     and handled loosely (compile errors also recognised from the output text)
+     Codeforces' Cloudflare check). Checked live (Oct 2026): with the runner uninstalled the IDE
+     showed "Running on Codeforces" and Run worked on a logged-in problem page. Still unconfirmed:
+     the verdict strings for errors (RE/CE/TLE) are guessed and handled loosely (compile errors
+     also recognised from the output text)
 7. **GitHub download** — done (no repository or release published yet)
    - `scripts/release.ps1` (no new tools): checks that `package.json`, `manifest.json` and
      `runner/host.go` agree on the version, does a fresh `npm run build`, builds the runner
