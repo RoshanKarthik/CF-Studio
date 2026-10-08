@@ -2,7 +2,8 @@
 runner/bin/
 *.exe
 
-# local tool config
+# local tool config (CLAUDE.md: coding-session notes, kept out of the repo)
+CLAUDE.md
 .claude/
 
 # release zips (scripts/release.ps1)
