@@ -59,9 +59,8 @@ Competitive programming only. No hints, editorials, discussions or AI features.
      whole process tree killed; processes start suspended and resume inside the job
    - Codeforces-like builds: `g++ -std=c++20 -O2 -static -DLOCAL`, 256 MB stack; Java runs the
      public class with `-Xmx` = memory limit; Python "compiles" with a syntax check
-   - Crash codes named (stack overflow, access violation, division by zero, abort); `
-`
-     normalized; output capped to fit Chrome's 1 MB message limit
+   - Crash codes named (stack overflow, access violation, division by zero, abort); Windows
+     line endings normalized; output capped to fit Chrome's 1 MB message limit
    - Extension: fixed ID via manifest `key` (`hapifcnfjgjenmejjnmgllgibaonhamb`),
      `NativeRunner` in `src/extension/nativeRunner.ts`
    - Tests: `go test ./...` runs real C++/Java/Python programs (AC, CE, TLE, MLE, deep
