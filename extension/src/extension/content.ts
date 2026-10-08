@@ -137,6 +137,13 @@ function main() {
         .status(page, index, count)
         .catch((err: unknown) => ({ ok: false as const, message: `Couldn't reach the Codeforces API: ${failed(err)}` }))
         .then((r) => post({ type: 'cfs:status-result', id, ...r }));
+    } else if (data?.type === 'cfs:customtest') {
+      // Only the IDE sends this, when the user pressed Run and no local runner is installed.
+      const { id, lang, code, input } = data;
+      void codeforces
+        .customTest(lang, code, input)
+        .catch((err: unknown) => ({ ok: false as const, login: false, message: `Couldn't reach Codeforces: ${failed(err)}` }))
+        .then((r) => post({ type: 'cfs:customtest-result', id, ...r }));
     } else if (data?.type === 'cfs:contest') {
       const { id } = data;
       void codeforces

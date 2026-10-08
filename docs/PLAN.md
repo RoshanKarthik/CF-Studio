@@ -112,3 +112,19 @@ Competitive programming only. No hints, editorials, discussions or AI features.
      with a fake runner, interaction verdicts, helpers, mirror paths, contest clock, bridge)
    - Not yet checked live: contest mode during a running contest (no contest was running), and
      interactive / stress / save from the installed extension (runner covered by Go tests)
+6. **Run without installing anything** — done
+   - Without the local runner, Run uses Codeforces' Custom Invocation in the user's session
+     (`src/core/customTest.ts`, content script `customTest`): the form at `/problemset/customtest`
+     (CSRF token, language list, read once per page), `POST /data/customtest`
+     `action=submitSourceCode` → `customTestSubmitId`, then `action=getVerdict` every 2 s until a
+     verdict (`output`, `stat` "15 ms, 3400 KB"); one test per invocation, queued one at a time;
+     time and memory judged against the problem's own limits
+   - `FallbackRunner` picks the local runner when installed, else Codeforces; the status shows
+     "Running on Codeforces (runner not installed)" (amber). Stress tests, interactors and saving
+     to disk say they need the runner
+   - Protocol read from the user's saved copy of the logged-in page (the built-in browser can't pass
+     Codeforces' Cloudflare check); not yet run live — the verdict strings for errors are guessed
+     and handled loosely (compile errors also recognised from the output text)
+7. **GitHub download** — next: release zip of the extension (unpacked install; the manifest `key`
+   keeps one extension ID for everyone) and the runner; double-clicking the runner installs it to
+   `%LOCALAPPDATA%\Programs\CF Studio` and lists the compilers found (done in the runner)

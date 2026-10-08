@@ -32,6 +32,14 @@ card.
 
 ## Install the runner (runs your code)
 
+Optional: without the runner, **Run** sends each test to Codeforces' own Custom Invocation (you
+must be logged in) — slower, one test at a time, and no stress tests, interactors or saving to
+disk. The top bar then shows "Running on Codeforces" with an amber dot.
+
+A downloaded `cfstudio-runner.exe` installs itself when double-clicked: it copies itself to
+`%LOCALAPPDATA%\Programs\CF Studio`, registers with Chrome, Edge and Brave, and lists the compilers
+it found. To build it yourself:
+
 Needs Go 1.27+ (`winget install GoLang.Go`) and the compilers you use on PATH: g++ (MinGW-w64),
 a JDK, Python 3 / PyPy 3.
 

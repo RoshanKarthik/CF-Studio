@@ -61,6 +61,11 @@ export type RunEvent = CompileEvent | TestEvent;
 
 export interface RunnerStatus {
   connected: boolean;
+  /**
+   * Code runs on Codeforces (Custom Invocation), not on this computer: slower, one test at a
+   * time, and no stress tests, interactors or saving to disk.
+   */
+  remote?: boolean;
   /** Shown to the user, e.g. "g++ 13.2 · javac 23 · Python 3.11". */
   detail: string;
 }

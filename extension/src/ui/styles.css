@@ -221,6 +221,11 @@ button:disabled {
   box-shadow: 0 0 0 3px var(--ok-soft);
 }
 
+.runner-dot.remote .dot {
+  background: var(--warn);
+  box-shadow: 0 0 0 3px var(--warn-soft);
+}
+
 .runner-dot.bad .dot {
   background: var(--bad);
   box-shadow: 0 0 0 3px var(--bad-soft);

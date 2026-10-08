@@ -21,7 +21,9 @@ export type IdeMessage =
   /** Contest mode: the contest's phase and time (`contest.standings`, raw JSON). */
   | { type: 'cfs:contest'; id: number }
   /** Contest mode: the statements of all the contest's problems, from its /problems page. */
-  | { type: 'cfs:problems'; id: number };
+  | { type: 'cfs:problems'; id: number }
+  /** No local runner: run one test through Codeforces' Custom Invocation (user pressed Run). */
+  | { type: 'cfs:customtest'; id: number; lang: LangId; code: string; input: string };
 
 /** page → IDE: answer to `cfs:submit`. */
 export type SubmitReply =
@@ -43,13 +45,18 @@ export type ProblemsReply =
   | { type: 'cfs:problems-result'; id: number; ok: true; url: string; html: string }
   | { type: 'cfs:problems-result'; id: number; ok: false; message: string };
 
+/** page → IDE: answer to `cfs:customtest`, Codeforces' raw verdict/output/stat (the IDE checks them). */
+export type CustomTestReply =
+  | { type: 'cfs:customtest-result'; id: number; ok: true; verdict: string; output: string; stat: string }
+  | { type: 'cfs:customtest-result'; id: number; ok: false; login: boolean; message: string };
+
 /** page → IDE: the IDE was shown or hidden (it stays loaded while hidden). */
 export interface VisibleMessage {
   type: 'cfs:visible';
   visible: boolean;
 }
 
-export type PageMessage = InitMessage | SubmitReply | StatusReply | ContestReply | ProblemsReply | VisibleMessage;
+export type PageMessage = InitMessage | SubmitReply | StatusReply | ContestReply | ProblemsReply | CustomTestReply | VisibleMessage;
 
 /** page → IDE */
 export interface InitMessage {

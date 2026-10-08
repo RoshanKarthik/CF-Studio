@@ -513,7 +513,7 @@ export function App({ problem, runner, kv, initial, judge: cf, onExit, onShowOnC
 
         <div className="topbar-right">
           <span
-            className={`runner-dot ${runnerStatus?.connected ? 'ok' : 'bad'}`}
+            className={`runner-dot ${runnerStatus?.remote ? 'remote' : runnerStatus?.connected ? 'ok' : 'bad'}`}
             title={runnerStatus ? runnerStatus.detail : 'Checking runner…'}
           >
             <span className="dot" />
@@ -782,6 +782,7 @@ export function App({ problem, runner, kv, initial, judge: cf, onExit, onShowOnC
                     hasGen={Boolean(helpers.gen)}
                     hasBrute={Boolean(helpers.brute)}
                     interactive={problem.interactive || interactor !== null}
+                    remote={Boolean(runnerStatus?.remote)}
                     onCreate={createHelper}
                     onOpen={setActiveFile}
                     onStart={startStress}

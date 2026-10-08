@@ -5,10 +5,13 @@
  */
 import { isLangId } from '../core/languages';
 import type { LangId } from '../core/languages';
+import { buildCustomTestBody, readCustomTestStart, readCustomTestVerdict } from '../core/customTest';
 import { filterForProblem } from '../core/submissions';
+import type { SubmitForm } from '../core/submit';
 import {
   buildSubmitBody,
   isBrowserCheck,
+  isLoggedOut,
   pageHandle,
   pickProgramType,
   readSubmitPage,
@@ -114,6 +117,92 @@ export async function status(page: PageProblem, index: string, count: number): P
 }
 
 type Failure = { ok: false; message: string };
+
+// --- Custom Invocation (running code on Codeforces when there's no local runner) ------------
+
+const CUSTOM_TEST_PAGE = '/problemset/customtest';
+const CUSTOM_TEST_POLL_MS = 2000;
+const CUSTOM_TEST_TIMEOUT_MS = 120_000;
+
+type CustomTestResult =
+  | { ok: true; verdict: string; output: string; stat: string }
+  | { ok: false; login: boolean; message: string };
+
+let customForm: Promise<SubmitForm> | null = null;
+let customQueue: Promise<unknown> = Promise.resolve();
+
+/** The Custom Invocation form (CSRF token, language list), read once per page. */
+async function readCustomForm(): Promise<SubmitForm> {
+  const res = await fetch(CUSTOM_TEST_PAGE, { credentials: 'same-origin' });
+  const html = await res.text();
+  if (isBrowserCheck(res.status, html)) throw new Error(BROWSER_CHECK);
+  const page = readSubmitPage(parseHtml(html));
+  if (page.kind === 'login') throw new LoginError();
+  if (page.kind === 'error') throw new Error(page.message);
+  return page.form;
+}
+
+class LoginError extends Error {
+  constructor() {
+    super('You are not logged in to Codeforces.');
+  }
+}
+
+async function postCustomTest(body: FormData | URLSearchParams): Promise<unknown> {
+  const res = await fetch('/data/customtest', { method: 'POST', body, credentials: 'same-origin' });
+  const text = await res.text();
+  if (isBrowserCheck(res.status, text)) throw new Error(BROWSER_CHECK);
+  try {
+    return JSON.parse(text);
+  } catch {
+    if (isLoggedOut(parseHtml(text))) throw new LoginError();
+    throw new Error(`Codeforces answered ${res.status} to the test run.`);
+  }
+}
+
+/** Run code once on Codeforces with this input. Runs are queued, one at a time. */
+export function customTest(lang: LangId, code: string, input: string): Promise<CustomTestResult> {
+  const run = customQueue.then(() => customTestNow(lang, code, input));
+  customQueue = run.catch(() => {});
+  return run;
+}
+
+async function customTestNow(lang: LangId, code: string, input: string): Promise<CustomTestResult> {
+  if (!isLangId(lang) || typeof code !== 'string' || typeof input !== 'string') {
+    return { ok: false, login: false, message: 'Invalid run request.' };
+  }
+  try {
+    customForm ??= readCustomForm();
+    let form: SubmitForm;
+    try {
+      form = await customForm;
+    } catch (e) {
+      customForm = null;
+      throw e;
+    }
+    const program = pickProgramType(form.languages, lang);
+    if (!program) return { ok: false, login: false, message: "Codeforces' Custom Invocation doesn't offer this language." };
+    const body = new FormData();
+    for (const [name, value] of buildCustomTestBody(form, { programTypeId: program.id, source: code, input })) body.append(name, value);
+    const start = readCustomTestStart(await postCustomTest(body));
+    if (!start.ok) {
+      customForm = null; // a stale token is the usual cause; read the form again next time
+      return { ok: false, login: false, message: start.message };
+    }
+    const csrf = form.fields.find(([n]) => n === 'csrf_token')?.[1] ?? '';
+    const deadline = Date.now() + CUSTOM_TEST_TIMEOUT_MS;
+    while (Date.now() < deadline) {
+      await new Promise((r) => setTimeout(r, CUSTOM_TEST_POLL_MS));
+      const poll = new URLSearchParams({ csrf_token: csrf, communityCode: '', action: 'getVerdict', customTestSubmitId: String(start.id) });
+      const verdict = readCustomTestVerdict(await postCustomTest(poll), start.id);
+      if (verdict.done) return { ok: true, ...verdict.result };
+    }
+    return { ok: false, login: false, message: 'Codeforces took too long to run the code.' };
+  } catch (e) {
+    if (e instanceof LoginError) return { ok: false, login: true, message: e.message };
+    return { ok: false, login: false, message: e instanceof Error ? e.message : 'Network error' };
+  }
+}
 
 /** Contest mode: the contest's phase and timing (the IDE parses it). */
 export async function contest(page: PageProblem): Promise<{ ok: true; data: unknown } | Failure> {

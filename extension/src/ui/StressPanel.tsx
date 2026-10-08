@@ -14,6 +14,7 @@ export function StressPanel({
   hasGen,
   hasBrute,
   interactive,
+  remote,
   onCreate,
   onOpen,
   onStart,
@@ -24,6 +25,8 @@ export function StressPanel({
   hasGen: boolean;
   hasBrute: boolean;
   interactive: boolean;
+  /** Code runs on Codeforces (no local runner): too slow, and too many requests, for stress tests. */
+  remote: boolean;
   onCreate: (kind: HelperKind) => void;
   onOpen: (kind: HelperKind) => void;
   onStart: (maxTests: number) => void;
@@ -32,6 +35,14 @@ export function StressPanel({
 }) {
   const [maxTests, setMaxTests] = useState(1000);
 
+  if (remote) {
+    return (
+      <div className="empty-state">
+        Stress testing runs thousands of tests, so it needs the CF Studio runner on this computer. Without it, Run uses
+        Codeforces' Custom Invocation, one test at a time.
+      </div>
+    );
+  }
   if (interactive) {
     return <div className="empty-state">Stress testing compares outputs, so it isn't available for interactive problems.</div>;
   }

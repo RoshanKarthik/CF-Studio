@@ -6,10 +6,17 @@ import type { LangId } from '../core/languages';
 import type { Submission } from '../core/submissions';
 import { parseUserStatus, submissionPath } from '../core/submissions';
 import type { Problem } from '../core/types';
-import type { ContestReply, IdeMessage, PageMessage, ProblemsReply, StatusReply, SubmitReply } from './messages';
+import type { CustomTestResult } from '../core/customTest';
+import type { ContestReply, CustomTestReply, IdeMessage, PageMessage, ProblemsReply, StatusReply, SubmitReply } from './messages';
 
-type Reply = SubmitReply | StatusReply | ContestReply | ProblemsReply;
-const REPLY_TYPES = new Set<string>(['cfs:submit-result', 'cfs:status-result', 'cfs:contest-result', 'cfs:problems-result']);
+type Reply = SubmitReply | StatusReply | ContestReply | ProblemsReply | CustomTestReply;
+const REPLY_TYPES = new Set<string>([
+  'cfs:submit-result',
+  'cfs:status-result',
+  'cfs:contest-result',
+  'cfs:problems-result',
+  'cfs:customtest-result',
+]);
 
 /**
  * The IDE's side of talking to Codeforces: asks the content script (which runs on the Codeforces
@@ -114,6 +121,18 @@ export class PageBridge implements Judge {
       throw new Error('Unexpected problems page address.');
     }
     return { url: url.href, html: r.html };
+  }
+
+  /** Run code once on Codeforces (Custom Invocation) with this input. Rejects with SubmitError on failure. */
+  async customTest(lang: LangId, code: string, input: string): Promise<CustomTestResult> {
+    const r = await this.request<CustomTestReply>((id) => ({ type: 'cfs:customtest', id, lang, code, input }), 'cfs:customtest-result', 180_000);
+    if (r.ok !== true) {
+      throw new SubmitError(typeof r.message === 'string' && r.message ? r.message.slice(0, 500) : 'Codeforces could not run the code.', r.login === true);
+    }
+    if (typeof r.verdict !== 'string' || typeof r.output !== 'string' || typeof r.stat !== 'string') {
+      throw new Error('Unexpected reply from the page.');
+    }
+    return { verdict: r.verdict, output: r.output, stat: r.stat };
   }
 
   submissionUrl(s: Submission): string {

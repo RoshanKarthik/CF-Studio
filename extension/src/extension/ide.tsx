@@ -2,6 +2,7 @@ import { StrictMode, useCallback, useEffect, useMemo, useRef, useState } from 'r
 import { createRoot } from 'react-dom/client';
 import type { ContestInfo } from '../core/contest';
 import { contestClock } from '../core/contest';
+import { FallbackRunner } from '../core/fallbackRunner';
 import { parseProblemPage, parseProblemUrl } from '../core/parseProblem';
 import type { Problem } from '../core/types';
 import { App } from '../ui/App';
@@ -12,19 +13,20 @@ import '../ui/styles.css';
 import { ChromeStorageKV } from './chromeKV';
 import type { IdeMessage, PageMessage } from './messages';
 import { CLASSIC_VIEW_HASH, isCodeforcesOrigin } from './messages';
+import { CodeforcesRunner } from './codeforcesRunner';
 import { NativeRunner } from './nativeRunner';
 import { PageBridge } from './pageBridge';
 
 const kv = new ChromeStorageKV();
 const parentOrigin = location.ancestorOrigins?.[0] ?? '';
 
-const runner = new NativeRunner();
-
 function send(msg: IdeMessage) {
   window.parent.postMessage(msg, parentOrigin);
 }
 
 const judge = new PageBridge(parentOrigin, send);
+// The local runner when it's installed, else Codeforces' Custom Invocation.
+const runner = new FallbackRunner(new NativeRunner(), new CodeforcesRunner(judge));
 
 function Boot({ text }: { text: string }) {
   return <div className="boot">{text}</div>;
