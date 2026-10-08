@@ -13,7 +13,7 @@ whole workspace, not just the editor.
 Windows, Chrome / Edge / Brave. No Chrome Web Store needed.
 
 1. Download `cf-studio-<version>-windows.zip` from the
-   [Releases page](https://github.com/OWNER/cf-studio/releases/latest) and unzip it.
+   [Releases page](https://github.com/RoshanKarthik/CF-Studio/releases/latest) and unzip it.
 2. Move the **CF Studio extension** folder somewhere it can stay (the browser loads it from there).
 3. Open `chrome://extensions` (`edge://extensions`, `brave://extensions`), turn on
    **Developer mode**, click **Load unpacked** and pick the **CF Studio extension** folder.
