@@ -2,6 +2,7 @@
 #   CF Studio extension\   the built extension (load unpacked; the manifest "key" fixes its ID)
 #   cfstudio-runner.exe    the runner (double-click to install)
 #   INSTALL.txt            scripts\INSTALL.txt with the version filled in
+#   LICENSE.txt            the MIT license
 #
 # Usage: powershell -ExecutionPolicy Bypass -File scripts\release.ps1
 
@@ -70,6 +71,8 @@ if ($built -ne $version) { throw "cfstudio-runner.exe reports version '$built'" 
 $install = (Get-Content (Join-Path $PSScriptRoot 'INSTALL.txt') -Raw).Replace('{version}', $version)
 $install = $install -replace "`r?`n", "`r`n"
 [IO.File]::WriteAllText((Join-Path $stage 'INSTALL.txt'), $install, (New-Object Text.UTF8Encoding $false))
+$license = (Get-Content (Join-Path $root 'LICENSE') -Raw) -replace "`r?`n", "`r`n"
+[IO.File]::WriteAllText((Join-Path $stage 'LICENSE.txt'), $license, (New-Object Text.UTF8Encoding $false))
 
 # Zip with forward-slash entry names (Compress-Archive in PowerShell 5 writes backslashes).
 Add-Type -AssemblyName System.IO.Compression, System.IO.Compression.FileSystem

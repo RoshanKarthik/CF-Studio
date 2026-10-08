@@ -143,7 +143,7 @@ powershell -ExecutionPolicy Bypass -File scripts/release.ps1
 
 It does a fresh `npm run build`, builds the runner with `go build -trimpath -ldflags "-s -w"`, and
 writes `release/cf-studio-<version>-windows.zip` (the **CF Studio extension** folder, keeping the
-manifest `key`, plus `cfstudio-runner.exe` and `INSTALL.txt` from `scripts/INSTALL.txt`). Attach
+manifest `key`, plus `cfstudio-runner.exe`, `INSTALL.txt` from `scripts/INSTALL.txt` and `LICENSE.txt`). Attach
 the zip to a GitHub release. The "Install the runner" links point to `RELEASES_URL` in
 `extension/src/core/links.ts`.
 
@@ -159,3 +159,7 @@ the zip to a GitHub release. The "Install the runner" links point to `RELEASES_U
 | IDE ↔ Codeforces page | `Alt+I` |
 | Settings (font size, themes, editor) | `Ctrl+,` |
 | Command palette | `F1` |
+
+## License
+
+MIT, see [LICENSE](LICENSE).

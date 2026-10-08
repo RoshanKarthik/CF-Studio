@@ -131,7 +131,8 @@ Competitive programming only. No hints, editorials, discussions or AI features.
      (`GOOS=windows GOARCH=amd64`, `-trimpath -ldflags "-s -w"`) and checks it reports that
      version, and writes `release/cf-studio-<version>-windows.zip`: `CF Studio extension/`
      (= `extension/dist`; refuses to build without the manifest `key`, so every unpacked copy has
-     the ID the runner allows), `cfstudio-runner.exe`, `INSTALL.txt` (`scripts/INSTALL.txt`, CRLF).
+     the ID the runner allows), `cfstudio-runner.exe`, `INSTALL.txt` (`scripts/INSTALL.txt`, CRLF),
+     `LICENSE.txt` (MIT, `LICENSE`).
      Zipped with .NET's `ZipFile` and forward-slash entry names (PowerShell 5's `Compress-Archive`
      writes backslashes)
    - Double-clicking the runner installs it to `%LOCALAPPDATA%\Programs\CF Studio`, registers it
