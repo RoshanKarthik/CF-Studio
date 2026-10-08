@@ -69,7 +69,9 @@ export function CodeEditor({ path, language, value, onChange, options, onReady, 
       cursorBlinking: 'smooth',
       renderLineHighlight: 'all',
       bracketPairColorization: { enabled: true },
-      guides: { bracketPairs: 'active', indentation: true },
+      // Plain indentation guides only: the coloured bracket-pair guides draw a line under the
+      // current block's opening line while typing, which reads like an error underline.
+      guides: { bracketPairs: false, bracketPairsHorizontal: false, indentation: true, highlightActiveIndentation: true },
       stickyScroll: { enabled: false },
       fixedOverflowWidgets: true,
       model: null,
