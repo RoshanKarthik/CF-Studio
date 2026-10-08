@@ -781,6 +781,7 @@ body:has(.splitter.dragging) {
 /* ================================================================ editor */
 
 .editor-head {
+  container-type: inline-size;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -795,6 +796,7 @@ body:has(.splitter.dragging) {
   align-self: stretch;
   display: flex;
   align-items: stretch;
+  flex: 0 1 auto;
   min-width: 0;
   overflow-x: auto;
   scrollbar-width: none;
@@ -821,6 +823,17 @@ body:has(.splitter.dragging) {
 .file-tab.active {
   background: var(--panel);
   color: var(--text);
+}
+
+/* Narrow editor: toolbar buttons become icons, so the file tabs keep their room. */
+@container (max-width: 860px) {
+  .editor-head .tb-label {
+    display: none;
+  }
+
+  .file-tab {
+    padding: 0 12px;
+  }
 }
 
 .file-close {

@@ -658,7 +658,7 @@ export function App({ problem, runner, kv, initial, judge: cf, onExit, nav, cont
                   title="Templates"
                   trigger={
                     <>
-                      <LayoutTemplate size={14} /> Templates
+                      <LayoutTemplate size={14} /> <span className="tb-label">Templates</span>
                     </>
                   }
                 >
@@ -702,7 +702,7 @@ export function App({ problem, runner, kv, initial, judge: cf, onExit, nav, cont
                 </Menu>
               )}
               <button className="tb-btn" onClick={format} title="Format code (Shift+Alt+F)">
-                <Wand2 size={14} /> Format
+                <Wand2 size={14} /> <span className="tb-label">Format</span>
               </button>
               {fileKind === 'main' && (
                 <button
