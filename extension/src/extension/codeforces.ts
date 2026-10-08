@@ -15,6 +15,7 @@ import {
   readSubmitResponse,
   submitTarget,
 } from '../core/submit';
+import { statementHtml } from './scrape';
 
 export interface PageProblem {
   kind: 'contest' | 'gym';
@@ -90,19 +91,47 @@ export async function submit(page: PageProblem, index: string, lang: LangId, cod
 const API_GAP_MS = 2000;
 let nextApiCall = 0;
 
+/** One API call, at least API_GAP_MS after the previous one; null if the answer isn't JSON. */
+async function api(path: string): Promise<{ status: number; json: unknown }> {
+  const wait = nextApiCall - Date.now();
+  nextApiCall = Math.max(Date.now(), nextApiCall) + API_GAP_MS;
+  if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+  const res = await fetch(path, { credentials: 'omit' });
+  try {
+    return { status: res.status, json: await res.json() };
+  } catch {
+    return { status: res.status, json: null };
+  }
+}
+
 export async function status(page: PageProblem, index: string, count: number): Promise<StatusResult> {
   const user = currentHandle();
   if (!user) return { ok: true, handle: null, data: null };
   const n = Math.max(1, Math.min(1000, Math.floor(Number(count) || 1)));
-  const wait = nextApiCall - Date.now();
-  nextApiCall = Math.max(Date.now(), nextApiCall) + API_GAP_MS;
-  if (wait > 0) await new Promise((r) => setTimeout(r, wait));
-  const res = await fetch(`/api/user.status?handle=${encodeURIComponent(user)}&from=1&count=${n}`, { credentials: 'omit' });
-  let json: unknown;
-  try {
-    json = await res.json();
-  } catch {
-    return { ok: false, message: `The Codeforces API answered ${res.status}.` };
-  }
+  const { status: code, json } = await api(`/api/user.status?handle=${encodeURIComponent(user)}&from=1&count=${n}`);
+  if (json === null) return { ok: false, message: `The Codeforces API answered ${code}.` };
   return { ok: true, handle: user, data: filterForProblem(json, page.contestId, index) };
+}
+
+type Failure = { ok: false; message: string };
+
+/** Contest mode: the contest's phase and timing (the IDE parses it). */
+export async function contest(page: PageProblem): Promise<{ ok: true; data: unknown } | Failure> {
+  if (page.problemset) return { ok: false, message: 'Not a contest page.' };
+  const { status: code, json } = await api(`/api/contest.standings?contestId=${page.contestId}&from=1&count=1`);
+  if (json === null) return { ok: false, message: `The Codeforces API answered ${code}.` };
+  return { ok: true, data: json };
+}
+
+/** Contest mode: every problem's statement, from the contest's own /problems page (one request). */
+export async function allProblems(page: PageProblem): Promise<{ ok: true; url: string; html: string } | Failure> {
+  if (page.problemset) return { ok: false, message: 'Not a contest page.' };
+  const path = `/${page.kind}/${page.contestId}/problems`;
+  const res = await fetch(path, { credentials: 'same-origin' });
+  const text = await res.text();
+  if (isBrowserCheck(res.status, text)) return { ok: false, message: BROWSER_CHECK };
+  if (!res.ok) return { ok: false, message: `Codeforces answered ${res.status} for the problems page.` };
+  const html = statementHtml(parseHtml(text));
+  if (!html) return { ok: false, message: "Couldn't find the statements on the contest's problems page." };
+  return { ok: true, url: new URL(path, location.origin).href, html };
 }

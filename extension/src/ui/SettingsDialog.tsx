@@ -1,6 +1,7 @@
 import { Check, Keyboard, Palette, SlidersHorizontal, Timer as TimerIcon, Type } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useState } from 'react';
+import { isFullPath } from '../core/mirror';
 import type { Settings } from './state';
 import type { ThemeDef } from './themes';
 import { THEMES } from './themes';
@@ -190,6 +191,26 @@ export function SettingsDialog({
                 checked={settings.showTags}
                 onChange={(v) => set('showTags', v)}
               />
+              <label className="pref-row column">
+                <span className="pref-text">
+                  <span className="pref-label">Save solutions to a folder</span>
+                  <span className="pref-hint">
+                    Each solution is also written to folder\contest\index, e.g. 1915\A.cpp (needs the runner). Leave
+                    empty to keep them in the browser only.
+                  </span>
+                </span>
+                <input
+                  type="text"
+                  className="text-input"
+                  spellCheck={false}
+                  placeholder="C:\cp\codeforces"
+                  value={settings.solutionsFolder}
+                  onChange={(e) => set('solutionsFolder', e.target.value)}
+                />
+                {settings.solutionsFolder.trim() !== '' && !isFullPath(settings.solutionsFolder) && (
+                  <span className="pref-hint warn-text">Use a full path, starting with a drive letter like C:\</span>
+                )}
+              </label>
             </div>
           )}
 

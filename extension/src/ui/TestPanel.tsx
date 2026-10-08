@@ -1,5 +1,7 @@
 import { Check, ChevronDown, Circle, Loader2, Plus, Trash2, TriangleAlert, X } from 'lucide-react';
+import type { ReactNode } from 'react';
 import { useEffect, useState } from 'react';
+import type { TranscriptChunk } from '../core/runner';
 import type { ManualTest, TestResult, Verdict } from '../core/types';
 
 export interface CaseSpec {
@@ -12,9 +14,11 @@ export interface CompileInfo {
   ok: boolean;
   output: string;
   timeMs: number;
+  /** Replaces "Compilation Error", e.g. when it was the interactor that failed. */
+  title?: string;
 }
 
-export type TestTab = 'samples' | 'manual' | 'console';
+export type TestTab = 'samples' | 'manual' | 'stress' | 'console';
 
 export const VERDICT_LABEL: Record<Verdict, string> = {
   AC: 'Accepted',
@@ -37,7 +41,22 @@ export function verdictTone(v: Verdict | undefined): 'ok' | 'bad' | 'warn' | 'bu
   return 'bad';
 }
 
-function OutputBlock({ text, badLines, placeholder }: { text: string; badLines?: number[]; placeholder: string }) {
+/** An interactive run, as a conversation: what your program and the interactor said, in order. */
+function TranscriptView({ chunks }: { chunks: TranscriptChunk[] }) {
+  if (!chunks.length) return <div className="io-box empty">Nothing was exchanged</div>;
+  return (
+    <div className="io-box transcript">
+      {chunks.map((c, i) => (
+        <div key={i} className={`tr-turn ${c.from}`}>
+          <span className="tr-who">{c.from === 'solution' ? 'you' : 'interactor'}</span>
+          <pre>{c.text.replace(/\n$/, '')}</pre>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export function OutputBlock({ text, badLines, placeholder }: { text: string; badLines?: number[]; placeholder: string }) {
   if (!text) return <div className="io-box empty">{placeholder}</div>;
   const bad = new Set(badLines ?? []);
   const lines = text.replace(/\n$/, '').split('\n');
@@ -53,7 +72,7 @@ function OutputBlock({ text, badLines, placeholder }: { text: string; badLines?:
   );
 }
 
-function ResultHeader({ result }: { result: TestResult }) {
+export function ResultHeader({ result }: { result: TestResult }) {
   const tone = verdictTone(result.verdict);
   const busy = tone === 'busy';
   return (
@@ -77,14 +96,50 @@ function CaseView({
   spec,
   result,
   manual,
+  interactive,
   onChange,
 }: {
   spec: CaseSpec;
   result?: TestResult;
   manual?: boolean;
+  /** Custom tests are run through the interactor: the input is the interactor's test data. */
+  interactive?: boolean;
   onChange?: (patch: Partial<ManualTest>) => void;
 }) {
   const showOutput = result && result.verdict !== 'PENDING' && result.verdict !== 'RUNNING' && result.verdict !== 'CE';
+  if (interactive && manual) {
+    return (
+      <div className="case-view">
+        {result && <ResultHeader result={result} />}
+        <div className="io-label">Test data (the interactor reads it from the file in argv[1])</div>
+        <textarea
+          className="io-box editable"
+          value={spec.input}
+          spellCheck={false}
+          placeholder="e.g. the hidden number"
+          onChange={(e) => onChange?.({ input: e.target.value })}
+        />
+        <div className="io-label">Interaction</div>
+        {showOutput && result.transcript ? (
+          <TranscriptView chunks={result.transcript} />
+        ) : (
+          <div className="io-box empty">{result?.verdict === 'CE' ? 'Did not compile — see Console' : 'Run to see the interaction'}</div>
+        )}
+        {showOutput && result.interactorLog && (
+          <>
+            <div className="io-label">Interactor (stderr)</div>
+            <OutputBlock text={result.interactorLog} placeholder="" />
+          </>
+        )}
+        {showOutput && result.stderr && (
+          <>
+            <div className="io-label">Your debug output (stderr)</div>
+            <OutputBlock text={result.stderr} placeholder="" />
+          </>
+        )}
+      </div>
+    );
+  }
   return (
     <div className="case-view">
       {result && <ResultHeader result={result} />}
@@ -206,6 +261,10 @@ export function TestPanel({
   setTab,
   focusCase,
   onCollapse,
+  interactive,
+  notice,
+  stress,
+  stressBusy,
 }: {
   samples: CaseSpec[];
   manual: ManualTest[];
@@ -217,6 +276,13 @@ export function TestPanel({
   /** Bumped by the parent to jump to a case (e.g. the first failing one after a run). */
   focusCase: { tab: 'samples' | 'manual'; index: number; nonce: number } | null;
   onCollapse: () => void;
+  /** An interactor exists: custom tests run through it, samples aren't run. */
+  interactive: boolean;
+  /** Shown above the samples (e.g. how to test an interactive problem). */
+  notice: ReactNode;
+  /** Content of the Stress tab. */
+  stress: ReactNode;
+  stressBusy: boolean;
 }) {
   const [activeSample, setActiveSample] = useState(0);
   const [activeManual, setActiveManual] = useState(0);
@@ -261,6 +327,10 @@ export function TestPanel({
               manual.length > 0 && <span className="badge">{manual.length}</span>
             )}
           </button>
+          <button className={`tab ${tab === 'stress' ? 'active' : ''}`} onClick={() => setTab('stress')}>
+            Stress
+            {stressBusy && <Loader2 size={12} className="spin" />}
+          </button>
           <button className={`tab ${tab === 'console' ? 'active' : ''}`} onClick={() => setTab('console')}>
             Console
             {compile && !compile.ok && <span className="badge bad">!</span>}
@@ -274,6 +344,8 @@ export function TestPanel({
       </div>
 
       <div className="pane-scroll tests-body">
+        {tab === 'samples' && notice}
+        {tab === 'stress' && stress}
         {tab === 'samples' &&
           (samples.length ? (
             <>
@@ -299,12 +371,17 @@ export function TestPanel({
                 spec={manualCases[manualIdx]}
                 result={results[manual[manualIdx].id]}
                 manual
+                interactive={interactive}
                 onChange={(patch) => onManualChange(manual.map((m, j) => (j === manualIdx ? { ...m, ...patch } : m)))}
               />
             </>
           ) : (
             <div className="empty-state">
-              <p>Add your own tests — edge cases, big inputs, anything the samples miss.</p>
+              <p>
+                {interactive
+                  ? 'Add tests for the interactor: the data it reads (for example the hidden answer).'
+                  : 'Add your own tests — edge cases, big inputs, anything the samples miss.'}
+              </p>
               <button className="btn ghost" onClick={addManual}>
                 <Plus size={14} /> Add a test
               </button>
@@ -318,7 +395,7 @@ export function TestPanel({
             ) : (
               <>
                 <div className={`result-head ${compile.ok ? 'ok' : 'bad'}`}>
-                  <span className="result-verdict">{compile.ok ? 'Compiled' : 'Compilation Error'}</span>
+                  <span className="result-verdict">{compile.ok ? 'Compiled' : (compile.title ?? 'Compilation Error')}</span>
                   <span className="result-stats">{compile.timeMs} ms</span>
                 </div>
                 <pre className="io-box console-out">{compile.output || 'No warnings.'}</pre>

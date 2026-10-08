@@ -1,3 +1,5 @@
+import type { Helpers } from '../core/helpers';
+import { parseHelpers } from '../core/helpers';
 import type { LangId } from '../core/languages';
 import { isLangId } from '../core/languages';
 import type { KV } from '../core/storage';
@@ -21,6 +23,8 @@ export interface Settings {
   showTags: boolean;
   /** Extension: open the IDE as soon as a problem page loads (else via the launcher / Alt+I). */
   autoOpen: boolean;
+  /** Also write solutions to <folder>/<contest>/<index>.<ext> through the runner; '' = off. */
+  solutionsFolder: string;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -34,6 +38,7 @@ export const DEFAULT_SETTINGS: Settings = {
   autoStartTimer: true,
   showTags: false,
   autoOpen: true,
+  solutionsFolder: '',
 };
 
 export interface Layout {
@@ -61,10 +66,11 @@ export interface InitialState {
   timer: TimerState;
   /** Saved code per family for this problem (missing = start from the default template). */
   code: Partial<Record<string, string>>;
+  helpers: Helpers;
 }
 
 export async function loadInitialState(kv: KV, problem: Problem): Promise<InitialState> {
-  const [settings, layout, templates, manualTests, timer, cpp, java, py] = await Promise.all([
+  const [settings, layout, templates, manualTests, timer, cpp, java, py, helpers] = await Promise.all([
     kv.get<Partial<Settings>>(keys.settings),
     kv.get<Partial<Layout>>(keys.layout),
     kv.get<TemplateStore>(keys.templates),
@@ -73,9 +79,11 @@ export async function loadInitialState(kv: KV, problem: Problem): Promise<Initia
     kv.get<string>(keys.code(problem.id, 'cpp')),
     kv.get<string>(keys.code(problem.id, 'java')),
     kv.get<string>(keys.code(problem.id, 'py')),
+    kv.get<unknown>(keys.helpers(problem.id)),
   ]);
   const merged = { ...DEFAULT_SETTINGS, ...settings };
   if (!isLangId(merged.lang)) merged.lang = DEFAULT_SETTINGS.lang;
+  if (typeof merged.solutionsFolder !== 'string') merged.solutionsFolder = '';
   return {
     settings: merged,
     layout: { ...DEFAULT_LAYOUT, ...layout },
@@ -83,5 +91,6 @@ export async function loadInitialState(kv: KV, problem: Problem): Promise<Initia
     manualTests: Array.isArray(manualTests) ? manualTests : [],
     timer: timer ?? { elapsedMs: 0, startedAt: null },
     code: { cpp, java, py },
+    helpers: parseHelpers(helpers),
   };
 }

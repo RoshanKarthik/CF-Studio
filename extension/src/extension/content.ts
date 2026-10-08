@@ -136,6 +136,18 @@ function main() {
         .status(page, index, count)
         .catch((err: unknown) => ({ ok: false as const, message: `Couldn't reach the Codeforces API: ${failed(err)}` }))
         .then((r) => post({ type: 'cfs:status-result', id, ...r }));
+    } else if (data?.type === 'cfs:contest') {
+      const { id } = data;
+      void codeforces
+        .contest(page)
+        .catch((err: unknown) => ({ ok: false as const, message: failed(err) }))
+        .then((r) => post({ type: 'cfs:contest-result', id, ...r }));
+    } else if (data?.type === 'cfs:problems') {
+      const { id } = data;
+      void codeforces
+        .allProblems(page)
+        .catch((err: unknown) => ({ ok: false as const, message: failed(err) }))
+        .then((r) => post({ type: 'cfs:problems-result', id, ...r }));
     }
   });
 

@@ -59,6 +59,8 @@ export class MemoryKV implements KV {
 export const keys = {
   code: (problemId: string, family: string) => `code:${problemId}:${family}`,
   manualTests: (problemId: string) => `manual:${problemId}`,
+  /** Generator, brute force and interactor for a problem (see helpers.ts). */
+  helpers: (problemId: string) => `helpers:${problemId}`,
   timer: (problemId: string) => `timer:${problemId}`,
   templates: 'templates',
   settings: 'settings',

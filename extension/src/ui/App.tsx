@@ -3,10 +3,12 @@ import {
   ChevronRight,
   ChevronUp,
   LayoutTemplate,
+  ListChecks,
   Maximize2,
   Minimize2,
   PanelLeftOpen,
   Play,
+  Plus,
   RotateCcw,
   Send,
   Settings as SettingsIcon,
@@ -15,9 +17,13 @@ import {
   X,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { checkOptionsFor, judge } from '../core/checker';
+import { checkOptionsFor, judge, judgeInteraction } from '../core/checker';
+import type { ContestInfo } from '../core/contest';
+import type { HelperKind, Helpers } from '../core/helpers';
+import { HELPER_KINDS, HELPER_LABEL, helperFileName, helperTemplate } from '../core/helpers';
 import type { Judge } from '../core/judge';
 import type { Family, LangId } from '../core/languages';
+import { isFullPath, mirrorPath } from '../core/mirror';
 import { FAMILY_LABEL, LANGUAGES, language } from '../core/languages';
 import type { Runner, RunnerStatus } from '../core/runner';
 import type { KV } from '../core/storage';
@@ -27,18 +33,21 @@ import { addTemplate, defaultTemplate } from '../core/templates';
 import type { ManualTest, Problem, TestResult } from '../core/types';
 import type { EditorOptions, MonacoEditor } from './CodeEditor';
 import { CodeEditor, formatEnv } from './CodeEditor';
+import { ContestClock } from './ContestClock';
 import { ProblemPanel } from './ProblemPanel';
 import { ConfirmDialog, Kbd, Menu, MenuItem, Splitter, Toasts, useToasts } from './primitives';
 import { SettingsDialog } from './SettingsDialog';
 import type { InitialState, Layout, Settings, TimerState } from './state';
 import type { SubmitCheck } from './SubmitDialog';
 import { SubmitDialog } from './SubmitDialog';
+import { StressPanel } from './StressPanel';
 import { LiveVerdict, SubmissionsPanel } from './SubmissionsPanel';
 import type { CaseSpec, CompileInfo, TestTab } from './TestPanel';
 import { TestPanel, summary } from './TestPanel';
 import { TemplateManager } from './TemplateManager';
 import { applyTheme } from './themes';
 import { Timer, startTimer } from './Timer';
+import { useStress } from './useStress';
 import { useSubmissions } from './useSubmissions';
 
 const EXT: Record<Family, string> = { cpp: 'cpp', java: 'java', py: 'py' };
@@ -53,8 +62,16 @@ export interface AppProps {
   judge: Judge;
   /** Close the IDE and show the Codeforces page (extension only). */
   onExit?: () => void;
-  /** Other problems of the same contest, when the page had several. */
-  nav?: { problems: { id: string; index: string; title: string }[]; onSelect: (id: string) => void };
+  /** Other problems of the same contest, when the page had several (or they were loaded). */
+  nav?: {
+    problems: { id: string; index: string; title: string }[];
+    onSelect: (id: string) => void;
+    /** Contest mode: load every problem of the contest as tabs (single-problem contest pages). */
+    onLoadAll?: () => Promise<void>;
+    loadingAll?: boolean;
+  };
+  /** Contest mode: the contest's timing, for the countdown. */
+  contest?: ContestInfo | null;
 }
 
 type Dialog =
@@ -62,7 +79,10 @@ type Dialog =
   | { kind: 'settings' }
   | { kind: 'submit' }
   | { kind: 'replace'; template: Template; reason: 'insert' | 'reset' }
+  | { kind: 'removeHelper'; helper: HelperKind }
   | null;
+
+const HELPER_HINT: Record<HelperKind, string> = { gen: 'stress test', brute: 'stress test', interactor: 'interactive' };
 
 /** Debounced write of `value` to storage whenever it changes (skips the initial value). */
 function usePersist<T>(kv: KV, key: string, value: T, delay = 300) {
@@ -86,11 +106,13 @@ function Logo() {
   );
 }
 
-export function App({ problem, runner, kv, initial, judge: cf, onExit, nav }: AppProps) {
+export function App({ problem, runner, kv, initial, judge: cf, onExit, nav, contest }: AppProps) {
   const [settings, setSettings] = useState<Settings>(initial.settings);
   const [layout, setLayout] = useState<Layout>(initial.layout);
   const [templates, setTemplates] = useState<TemplateStore>(initial.templates);
   const [manual, setManual] = useState<ManualTest[]>(initial.manualTests);
+  const [helpers, setHelpers] = useState<Helpers>(initial.helpers);
+  const [activeFile, setActiveFile] = useState<'main' | HelperKind>('main');
   const [timer, setTimer] = useState<TimerState>(initial.timer);
   const [codes, setCodes] = useState<Record<Family, string>>(() => {
     const start = (f: Family) => initial.code[f] ?? defaultTemplate(initial.templates, f)?.code ?? '';
@@ -123,6 +145,7 @@ export function App({ problem, runner, kv, initial, judge: cf, onExit, nav }: Ap
   usePersist(kv, keys.layout, layout);
   usePersist(kv, keys.templates, templates);
   usePersist(kv, keys.manualTests(problem.id), manual);
+  usePersist(kv, keys.helpers(problem.id), helpers);
   usePersist(kv, keys.timer(problem.id), timer, 0);
 
   // Code is saved only once edited, so an untouched problem follows the registered template.
@@ -163,11 +186,16 @@ export function App({ problem, runner, kv, initial, judge: cf, onExit, nav }: Ap
     [problem.samples],
   );
 
+  const interactor = helpers.interactor ?? null;
+
   const run = useCallback(async () => {
     if (running) return;
-    const cases: CaseSpec[] = [...sampleCases, ...manual.map((m) => ({ id: m.id, input: m.input, expected: m.expected }))];
+    // With an interactor, custom tests are the interactor's test data; samples aren't run.
+    const interactive = interactor !== null;
+    const manualCases = manual.map((m) => ({ id: m.id, input: m.input, expected: m.expected }));
+    const cases: CaseSpec[] = interactive ? manualCases : [...sampleCases, ...manualCases];
     if (!cases.length) {
-      push('info', 'No tests to run — add one under Custom');
+      push('info', interactive ? 'Add a test under Custom: the data your interactor reads' : 'No tests to run — add one under Custom');
       setTestTab('manual');
       return;
     }
@@ -186,8 +214,22 @@ export function App({ problem, runner, kv, initial, judge: cf, onExit, nav }: Ap
           tests: cases.map((c) => ({ id: c.id, input: c.input })),
           timeLimitMs: problem.timeLimitMs,
           memoryLimitMb: problem.memoryLimitMb,
+          interactor: interactor ?? undefined,
         },
         (ev) => {
+          if (ev.type === 'compile' && ev.target === 'interactor') {
+            setCompile((c) => ({
+              ok: ev.ok,
+              output: [c?.output, ev.output && `Interactor:\n${ev.output}`].filter(Boolean).join('\n'),
+              timeMs: (c?.timeMs ?? 0) + ev.timeMs,
+              title: ev.ok ? undefined : "The interactor didn't compile",
+            }));
+            if (!ev.ok) {
+              compiled = false;
+              setResults(Object.fromEntries(cases.map((c) => [c.id, pending('CE')])));
+            }
+            return;
+          }
           if (ev.type === 'compile') {
             setCompile({ ok: ev.ok, output: ev.output, timeMs: ev.timeMs });
             if (!ev.ok) {
@@ -198,7 +240,7 @@ export function App({ problem, runner, kv, initial, judge: cf, onExit, nav }: Ap
           }
           const spec = cases.find((c) => c.id === ev.id);
           if (!spec) return;
-          got[ev.id] = judge(ev, spec.expected, checkOpts, problem.timeLimitMs);
+          got[ev.id] = interactive ? judgeInteraction(ev, problem.timeLimitMs) : judge(ev, spec.expected, checkOpts, problem.timeLimitMs);
           setResults((r) => ({ ...r, [ev.id]: got[ev.id] }));
         },
       );
@@ -207,7 +249,7 @@ export function App({ problem, runner, kv, initial, judge: cf, onExit, nav }: Ap
         setTestTab('console');
         return;
       }
-      const failingSample = sampleCases.findIndex((c) => !isPass(got[c.id]));
+      const failingSample = interactive ? -1 : sampleCases.findIndex((c) => !isPass(got[c.id]));
       const failingManual = manual.findIndex((m) => !isPass(got[m.id]));
       if (failingSample >= 0) {
         setTestTab('samples');
@@ -224,7 +266,7 @@ export function App({ problem, runner, kv, initial, judge: cf, onExit, nav }: Ap
     } finally {
       setRunning(false);
     }
-  }, [running, sampleCases, manual, settings.lang, code, runner, problem, checkOpts, push]);
+  }, [running, interactor, sampleCases, manual, settings.lang, code, runner, problem, checkOpts, push]);
 
   // --- submit ----------------------------------------------------------------------------
   const submitCheck = useMemo<SubmitCheck>(() => {
@@ -253,6 +295,85 @@ export function App({ problem, runner, kv, initial, judge: cf, onExit, nav }: Ap
     push('ok', 'Submitted — waiting for the verdict');
     submissions.track(sent);
   };
+
+  // --- helper files (generator, brute force, interactor) ---------------------------------
+  const userTemplate = useCallback((f: Family) => defaultTemplate(templates, f)?.code ?? '', [templates]);
+
+  const createHelper = (kind: HelperKind) => {
+    setHelpers((h) => (h[kind] ? h : { ...h, [kind]: { lang: settings.lang, code: helperTemplate(kind, family, userTemplate(family)) } }));
+    setActiveFile(kind);
+  };
+
+  const setHelperLang = (kind: HelperKind, next: LangId) =>
+    setHelpers((h) => {
+      const cur = h[kind];
+      if (!cur) return h;
+      const from = language(cur.lang).family;
+      const to = language(next).family;
+      // An untouched starter follows the language; anything the user wrote is kept.
+      const untouched = cur.code === helperTemplate(kind, from, userTemplate(from));
+      return { ...h, [kind]: { lang: next, code: from !== to && untouched ? helperTemplate(kind, to, userTemplate(to)) : cur.code } };
+    });
+
+  const helperFile = activeFile === 'main' ? undefined : helpers[activeFile];
+  const fileKind: 'main' | HelperKind = helperFile ? activeFile : 'main';
+  const editLang = helperFile ? language(helperFile.lang) : lang;
+
+  const onHelperEdit = useCallback(
+    (value: string) => {
+      if (fileKind === 'main') return;
+      setHelpers((h) => {
+        const cur = h[fileKind];
+        return cur && cur.code !== value ? { ...h, [fileKind]: { ...cur, code: value } } : h;
+      });
+    },
+    [fileKind],
+  );
+
+  // --- stress testing --------------------------------------------------------------------
+  const stress = useStress(runner);
+  const startStress = (maxTests: number) => {
+    if (!helpers.gen || !helpers.brute) return;
+    void stress.start({
+      solution: { lang: settings.lang, code },
+      gen: helpers.gen,
+      brute: helpers.brute,
+      timeLimitMs: problem.timeLimitMs,
+      memoryLimitMb: problem.memoryLimitMb,
+      check: checkOpts,
+      maxTests,
+    });
+  };
+  const addCustomTest = (input: string, expected: string) => {
+    setManual((m) => [...m, { id: `m${Date.now().toString(36)}`, input, expected }]);
+    setTestTab('manual');
+    setFocusCase({ tab: 'manual', index: manual.length, nonce: Date.now() });
+    push('ok', 'Added as a custom test');
+  };
+
+  // --- solutions mirrored to disk (through the runner) -------------------------------------
+  const mirrorRoot = settings.solutionsFolder.trim();
+  const [mirrored, setMirrored] = useState<string | null>(null);
+  const mirrorError = useRef('');
+  useEffect(() => {
+    if (!mirrorRoot || !isFullPath(mirrorRoot) || !runner.save || !editedFamilies.current.has(family)) return;
+    const save = runner.save.bind(runner);
+    const id = setTimeout(() => {
+      save({ root: mirrorRoot, ...mirrorPath(problem, family), code }).then(
+        (path) => {
+          mirrorError.current = '';
+          setMirrored(path);
+        },
+        (e: unknown) => {
+          const message = e instanceof Error ? e.message : String(e);
+          if (message !== mirrorError.current) push('error', `Couldn't save to disk: ${message}`);
+          mirrorError.current = message;
+          setMirrored(null);
+        },
+      );
+    }, 1500);
+    return () => clearTimeout(id);
+  }, [code, family, mirrorRoot, runner, problem, push]);
 
   // --- editor actions --------------------------------------------------------------------
   useEffect(() => {
@@ -369,11 +490,22 @@ export function App({ problem, runner, kv, initial, judge: cf, onExit, nav }: Ap
               </span>
             )}
             <span className="crumb-title">{problem.title}</span>
+            {nav?.onLoadAll && (
+              <button
+                className="tb-btn"
+                disabled={nav.loadingAll}
+                title="Open every problem of this contest as tabs (loads the contest's problems page once)"
+                onClick={() => void nav.onLoadAll?.().catch((e: unknown) => push('error', e instanceof Error ? e.message : 'Couldn’t load the problems'))}
+              >
+                <ListChecks size={14} /> {nav.loadingAll ? 'Loading…' : 'All problems'}
+              </button>
+            )}
           </span>
         </div>
 
         <div className="topbar-center">
           <Timer state={timer} onChange={setTimer} />
+          {contest && <ContestClock info={contest} />}
           {submissions.live && <LiveVerdict live={submissions.live} judge={cf} onDismiss={submissions.dismiss} />}
         </div>
 
@@ -443,17 +575,63 @@ export function App({ problem, runner, kv, initial, judge: cf, onExit, nav }: Ap
         <div className="col-right">
           <div className="pane editor-pane" style={layout.testsOpen ? { height: `${layout.editor}%` } : { flex: 1 }}>
             <div className="editor-head">
-              <div className="file-tab">
-                <span className={`lang-dot ${family}`} />
-                {FILE_NAME[family]}
-                {!saved && <span className="unsaved" title="Saving…" />}
+              <div className="file-tabs">
+                <button
+                  className={`file-tab ${fileKind === 'main' ? 'active' : ''}`}
+                  onClick={() => setActiveFile('main')}
+                  title="Your solution — Run and Submit use this file"
+                >
+                  <span className={`lang-dot ${family}`} />
+                  {FILE_NAME[family]}
+                  {!saved && <span className="unsaved" title="Saving…" />}
+                </button>
+                {HELPER_KINDS.map((k) => {
+                  const h = helpers[k];
+                  if (!h) return null;
+                  const name = helperFileName(k, h.lang);
+                  return (
+                    <button key={k} className={`file-tab ${fileKind === k ? 'active' : ''}`} onClick={() => setActiveFile(k)} title={HELPER_LABEL[k]}>
+                      <span className={`lang-dot ${language(h.lang).family}`} />
+                      {name}
+                      <span
+                        className="file-close"
+                        role="button"
+                        title={`Delete ${name}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDialog({ kind: 'removeHelper', helper: k });
+                        }}
+                      >
+                        <X size={12} />
+                      </span>
+                    </button>
+                  );
+                })}
+                {HELPER_KINDS.some((k) => !helpers[k]) && (
+                  <Menu className="file-add" title="Add a generator, brute force or interactor" trigger={<Plus size={15} />}>
+                    {(close) =>
+                      HELPER_KINDS.filter((k) => !helpers[k]).map((k) => (
+                        <MenuItem
+                          key={k}
+                          hint={HELPER_HINT[k]}
+                          onClick={() => {
+                            close();
+                            createHelper(k);
+                          }}
+                        >
+                          {HELPER_LABEL[k]}
+                        </MenuItem>
+                      ))
+                    }
+                  </Menu>
+                )}
               </div>
               <Menu
                 className="lang-menu"
                 title="Language"
                 trigger={
                   <>
-                    {lang.label} <ChevronDown size={13} />
+                    {editLang.label} <ChevronDown size={13} />
                   </>
                 }
               >
@@ -461,9 +639,10 @@ export function App({ problem, runner, kv, initial, judge: cf, onExit, nav }: Ap
                   LANGUAGES.map((l) => (
                     <MenuItem
                       key={l.id}
-                      selected={l.id === settings.lang}
+                      selected={l.id === editLang.id}
                       onClick={() => {
-                        setSettings((s) => ({ ...s, lang: l.id }));
+                        if (fileKind === 'main') setSettings((s) => ({ ...s, lang: l.id }));
+                        else setHelperLang(fileKind, l.id);
                         close();
                       }}
                     >
@@ -473,72 +652,80 @@ export function App({ problem, runner, kv, initial, judge: cf, onExit, nav }: Ap
                 }
               </Menu>
               <span className="spacer" />
-              <Menu
-                align="right"
-                title="Templates"
-                trigger={
-                  <>
-                    <LayoutTemplate size={14} /> Templates
-                  </>
-                }
-              >
-                {(close) => (
-                  <>
-                    <div className="menu-title">{FAMILY_LABEL[family]} templates</div>
-                    {familyTemplates.length === 0 && <div className="menu-empty">None yet</div>}
-                    {familyTemplates.map((t) => (
+              {fileKind === 'main' && (
+                <Menu
+                  align="right"
+                  title="Templates"
+                  trigger={
+                    <>
+                      <LayoutTemplate size={14} /> Templates
+                    </>
+                  }
+                >
+                  {(close) => (
+                    <>
+                      <div className="menu-title">{FAMILY_LABEL[family]} templates</div>
+                      {familyTemplates.length === 0 && <div className="menu-empty">None yet</div>}
+                      {familyTemplates.map((t) => (
+                        <MenuItem
+                          key={t.id}
+                          onClick={() => {
+                            close();
+                            requestInsert(t, 'insert');
+                          }}
+                          hint={t.id === registered?.id ? <Star size={12} fill="currentColor" /> : undefined}
+                        >
+                          {t.name}
+                        </MenuItem>
+                      ))}
+                      <div className="menu-sep" />
                       <MenuItem
-                        key={t.id}
                         onClick={() => {
                           close();
-                          requestInsert(t, 'insert');
+                          const next = addTemplate(templates, { name: `My ${FAMILY_LABEL[family]} template`, family, code });
+                          setTemplates(next);
+                          setDialog({ kind: 'templates', selected: next.templates[next.templates.length - 1].id });
                         }}
-                        hint={t.id === registered?.id ? <Star size={12} fill="currentColor" /> : undefined}
                       >
-                        {t.name}
+                        Save current code as template…
                       </MenuItem>
-                    ))}
-                    <div className="menu-sep" />
-                    <MenuItem
-                      onClick={() => {
-                        close();
-                        const next = addTemplate(templates, { name: `My ${FAMILY_LABEL[family]} template`, family, code });
-                        setTemplates(next);
-                        setDialog({ kind: 'templates', selected: next.templates[next.templates.length - 1].id });
-                      }}
-                    >
-                      Save current code as template…
-                    </MenuItem>
-                    <MenuItem
-                      onClick={() => {
-                        close();
-                        setDialog({ kind: 'templates' });
-                      }}
-                    >
-                      Manage templates…
-                    </MenuItem>
-                  </>
-                )}
-              </Menu>
+                      <MenuItem
+                        onClick={() => {
+                          close();
+                          setDialog({ kind: 'templates' });
+                        }}
+                      >
+                        Manage templates…
+                      </MenuItem>
+                    </>
+                  )}
+                </Menu>
+              )}
               <button className="tb-btn" onClick={format} title="Format code (Shift+Alt+F)">
                 <Wand2 size={14} /> Format
               </button>
-              <button
-                className="tb-btn icon"
-                title="Reset to your default template"
-                onClick={() => registered && requestInsert(registered, 'reset')}
-                disabled={!registered}
-              >
-                <RotateCcw size={14} />
-              </button>
+              {fileKind === 'main' && (
+                <button
+                  className="tb-btn icon"
+                  title="Reset to your default template"
+                  onClick={() => registered && requestInsert(registered, 'reset')}
+                  disabled={!registered}
+                >
+                  <RotateCcw size={14} />
+                </button>
+              )}
             </div>
 
             <div className="editor-host">
               <CodeEditor
-                path={`file:///problems/${problem.id}/main.${EXT[family]}`}
-                language={lang.monaco}
-                value={code}
-                onChange={onEdit}
+                path={
+                  fileKind === 'main'
+                    ? `file:///problems/${problem.id}/main.${EXT[family]}`
+                    : `file:///problems/${problem.id}/${fileKind}.${EXT[editLang.family]}`
+                }
+                language={editLang.monaco}
+                value={helperFile ? helperFile.code : code}
+                onChange={fileKind === 'main' ? onEdit : onHelperEdit}
                 options={editorOptions}
                 onReady={(ed) => {
                   editorRef.current = ed;
@@ -553,7 +740,9 @@ export function App({ problem, runner, kv, initial, judge: cf, onExit, nav }: Ap
               </span>
               <span>Spaces: {settings.tabSize}</span>
               <span className="spacer" />
-              <span>{saved ? 'Saved' : 'Saving…'}</span>
+              <span title={mirrored ? `Also saved to ${mirrored}` : undefined}>
+                {saved ? (mirrored ? 'Saved · on disk' : 'Saved') : 'Saving…'}
+              </span>
               <button className="status-btn" onClick={() => setLayout((l) => ({ ...l, testsOpen: !l.testsOpen }))}>
                 {layout.testsOpen ? <ChevronDown size={13} /> : <ChevronUp size={13} />} Tests
               </button>
@@ -573,6 +762,38 @@ export function App({ problem, runner, kv, initial, judge: cf, onExit, nav }: Ap
                 setTab={setTestTab}
                 focusCase={focusCase}
                 onCollapse={() => setLayout((l) => ({ ...l, testsOpen: false }))}
+                interactive={interactor !== null}
+                notice={
+                  interactor ? (
+                    <div className="notice">
+                      <span>
+                        Interactive mode: <b>Run</b> sends each <b>Custom</b> test to your interactor (
+                        {helperFileName('interactor', interactor.lang)}) and shows the conversation. Samples aren't run.
+                      </span>
+                    </div>
+                  ) : problem.interactive ? (
+                    <div className="notice">
+                      <span>This is an interactive problem. To test it here, add an interactor that plays the judge's side.</span>
+                      <button className="btn ghost small" onClick={() => createHelper('interactor')}>
+                        <Plus size={13} /> Create interactor
+                      </button>
+                    </div>
+                  ) : null
+                }
+                stressBusy={stress.state.running}
+                stress={
+                  <StressPanel
+                    state={stress.state}
+                    hasGen={Boolean(helpers.gen)}
+                    hasBrute={Boolean(helpers.brute)}
+                    interactive={problem.interactive || interactor !== null}
+                    onCreate={createHelper}
+                    onOpen={setActiveFile}
+                    onStart={startStress}
+                    onStop={stress.stop}
+                    onAddTest={addCustomTest}
+                  />
+                }
               />
             </>
           )}
@@ -604,6 +825,25 @@ export function App({ problem, runner, kv, initial, judge: cf, onExit, nav }: Ap
           confirmLabel={dialog.reason === 'reset' ? 'Reset' : 'Replace'}
           onCancel={() => setDialog(null)}
           onConfirm={() => insertTemplate(dialog.template)}
+        />
+      )}
+      {dialog?.kind === 'removeHelper' && (
+        <ConfirmDialog
+          title={`Delete the ${HELPER_LABEL[dialog.helper].toLowerCase()}?`}
+          message={<>Its code ({helperFileName(dialog.helper, helpers[dialog.helper]?.lang ?? settings.lang)}) will be deleted.</>}
+          confirmLabel="Delete"
+          danger
+          onCancel={() => setDialog(null)}
+          onConfirm={() => {
+            const kind = dialog.helper;
+            setHelpers((h) => {
+              const next = { ...h };
+              delete next[kind];
+              return next;
+            });
+            setActiveFile('main');
+            setDialog(null);
+          }}
         />
       )}
       {dialog?.kind === 'submit' && (

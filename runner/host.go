@@ -23,6 +23,11 @@ type testCase struct {
 	Input string `json:"input"`
 }
 
+type source struct {
+	Lang string `json:"lang"`
+	Code string `json:"code"`
+}
+
 type request struct {
 	Type          string     `json:"type"`
 	Lang          string     `json:"lang"`
@@ -30,6 +35,12 @@ type request struct {
 	Tests         []testCase `json:"tests"`
 	TimeLimitMs   int        `json:"timeLimitMs"`
 	MemoryLimitMb int        `json:"memoryLimitMb"`
+	// interact: the interactor, run with the test's input file next to the solution.
+	Interactor *source `json:"interactor,omitempty"`
+	// save: write Code to Root/Folder/Name.
+	Root   string `json:"root,omitempty"`
+	Folder string `json:"folder,omitempty"`
+	Name   string `json:"name,omitempty"`
 }
 
 type helloReply struct {
@@ -43,6 +54,10 @@ type compileEvent struct {
 	OK     bool   `json:"ok"`
 	Output string `json:"output"`
 	TimeMs int64  `json:"timeMs"`
+	// Cached: an earlier run compiled the same code, so the compiler wasn't started.
+	Cached bool `json:"cached,omitempty"`
+	// Target is "interactor" for the interactor's build in an interactive run.
+	Target string `json:"target,omitempty"`
 }
 
 type testEvent struct {
@@ -58,6 +73,11 @@ type testEvent struct {
 	Truncated      bool   `json:"truncated"`
 	// Detail explains a crash, e.g. "stack overflow".
 	Detail string `json:"detail,omitempty"`
+	// Idle: stopped by the wall clock while waiting, not computing (usually: waiting for input).
+	Idle bool `json:"idle,omitempty"`
+	// Interactive runs only.
+	Interactor *interactorResult `json:"interactor,omitempty"`
+	Transcript []chunk           `json:"transcript,omitempty"`
 }
 
 type doneEvent struct {
@@ -99,6 +119,10 @@ func serve(in io.Reader, out io.Writer) error {
 			err = w.send(helloReply{"hello", version, tools()})
 		case "run":
 			err = handleRun(req, tools(), w)
+		case "interact":
+			err = handleInteract(req, tools(), w)
+		case "save":
+			err = handleSave(req, w)
 		default:
 			err = w.send(errorEvent{"error", "unknown request " + req.Type})
 		}
@@ -122,38 +146,24 @@ func handleRun(req request, tc toolchains, w *messageWriter) error {
 	tl := time.Duration(clamp(req.TimeLimitMs, 100, 30_000)) * time.Millisecond
 	ml := clamp(req.MemoryLimitMb, 16, 4096)
 
+	// The program runs in a fresh folder (files it writes don't end up in the cached build).
 	dir, err := os.MkdirTemp("", "cfstudio-")
 	if err != nil {
 		return w.send(errorEvent{"error", "Couldn't create a work folder: " + err.Error()})
 	}
 	defer os.RemoveAll(dir)
 
-	prog, err := prepare(req.Lang, req.Code, dir, ml, tc)
+	b, err := build(req.Lang, req.Code, ml, tc)
 	if err != nil {
 		return w.send(errorEvent{"error", err.Error()})
 	}
-
-	if prog.compile != nil {
-		start := time.Now()
-		res, err := runLimited(prog.compile, dir, nil, limits{cpuTime: 60 * time.Second, wallTime: 90 * time.Second}, compileCap, compileCap)
-		elapsed := time.Since(start).Milliseconds()
-		if err != nil {
-			return w.send(errorEvent{"error", "Couldn't start the compiler: " + err.Error()})
-		}
-		output := lf(res.stdout) + lf(res.stderr)
-		ok := res.exitCode == 0 && !res.timedOut
-		if res.timedOut {
-			output += "\nCompilation took too long and was stopped."
-		}
-		if err := w.send(compileEvent{"compile", ok, output, elapsed}); err != nil {
-			return err
-		}
-		if !ok {
-			return w.send(doneEvent{"done"})
-		}
-	} else if err := w.send(compileEvent{"compile", true, "", 0}); err != nil {
+	if err := w.send(compileEvent{Type: "compile", OK: b.ok, Output: b.compileOutput, TimeMs: b.compileMs, Cached: b.cached}); err != nil {
 		return err
 	}
+	if !b.ok {
+		return w.send(doneEvent{"done"})
+	}
+	prog := b.prog
 
 	lim := limits{
 		cpuTime: tl,
@@ -205,8 +215,33 @@ func sendFitting(w *messageWriter, ev testEvent) error {
 		}
 		ev.Stdout = ev.Stdout[:len(ev.Stdout)/2]
 		ev.Stderr = ev.Stderr[:len(ev.Stderr)/2]
+		if ev.Interactor != nil {
+			ev.Interactor.Stderr = ev.Interactor.Stderr[:len(ev.Interactor.Stderr)/2]
+		}
+		ev.Transcript = halveTranscript(ev.Transcript)
 		ev.Truncated = true
 	}
+}
+
+// halveTranscript keeps the first half of a transcript's text.
+func halveTranscript(chunks []chunk) []chunk {
+	total := 0
+	for _, c := range chunks {
+		total += len(c.Text)
+	}
+	room := total / 2
+	var out []chunk
+	for _, c := range chunks {
+		if room <= 0 {
+			break
+		}
+		if len(c.Text) > room {
+			c.Text = c.Text[:room]
+		}
+		room -= len(c.Text)
+		out = append(out, c)
+	}
+	return out
 }
 
 func javaOutOfMemory(lang string, stderr []byte) bool {

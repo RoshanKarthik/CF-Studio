@@ -86,5 +86,29 @@ Competitive programming only. No hints, editorials, discussions or AI features.
    - Not yet checked against a logged-in live submit form or a real submission: form fields and
      language labels follow Codeforces' known markup and a self-written fixture
      (`tests/fixtures/submit-form.html`); check both on first real use
-5. **Extras** — stress testing (brute force + generator), contest mode (problem tabs, countdown),
-   interactive problems, solutions mirrored to disk
+5. **Extras** — done
+   - Runner build cache (`runner/build.go`): builds keyed by language, code and compiler, kept in
+     `%LOCALAPPDATA%\cfstudio\builds` (60 most recent); compiled in a temporary folder and renamed
+     into place only on success; programs run in a fresh folder each time
+   - Helper files per problem (`src/core/helpers.ts`, stored under `helpers:<id>`): generator,
+     brute force, interactor, each with its own language, as extra editor tabs; starters for each
+     language (brute force = the user's template)
+   - Stress testing (`src/core/stress.ts`, Stress tab): seeds on the generator's stdin, a random
+     starting seed per session, batches of 10 then 50 (three runner calls per batch, cached
+     builds), compared with the same checker as samples; stops on the first difference, a helper
+     failure, the chosen limit (100 / 1,000 / 10,000) or Stop
+   - Interactive problems: runner `interact` request (`runner/interact.go`) pipes solution and
+     interactor into each other, interactor gets `<input file> <output file>` (testlib) and its
+     exit code is the verdict; transcript recorded both ways (128 KB); a solution still running
+     1 s after the interactor finished is stopped; wall-clock stop while waiting = idleness.
+     Verdict in `judgeInteraction` (solution's TLE/MLE/RE first, then the interactor)
+   - Solutions mirrored to disk: runner `save` request (full root path, safe file names, atomic
+     write, skipped when unchanged), 1.5 s after edits, to `<folder>\<contest>\<index>.<ext>`
+   - Contest mode: `contest.standings?count=1` for phase and time (counted from the API's
+     `relativeTimeSeconds`, not the local clock); countdown in the top bar; during the contest
+     all problems load as tabs from `/contest/<id>/problems` (one request, parsed and sanitized in
+     the IDE), otherwise an **All problems** button
+   - Tests: Go (cache, prune, interaction AC/WA/idleness, save path checks), vitest (stress loop
+     with a fake runner, interaction verdicts, helpers, mirror paths, contest clock, bridge)
+   - Not yet checked live: contest mode during a running contest (no contest was running), and
+     interactive / stress / save from the installed extension (runner covered by Go tests)

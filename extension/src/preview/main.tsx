@@ -28,6 +28,7 @@ void loadInitialState(kv, problem).then((initial) => {
         kv={kv}
         initial={initial}
         judge={new SimulatedJudge()}
+        contest={{ name: 'Preview contest (simulated)', phase: 'CODING', durationSeconds: 7200, relativeTimeSeconds: 2400, fetchedAt: Date.now() }}
       />
     </StrictMode>,
   );

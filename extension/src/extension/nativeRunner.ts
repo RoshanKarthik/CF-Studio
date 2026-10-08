@@ -1,4 +1,4 @@
-import type { RunEvent, RunRequest, Runner, RunnerStatus } from '../core/runner';
+import type { RunEvent, RunRequest, Runner, RunnerStatus, SaveRequest } from '../core/runner';
 
 /** Native messaging host name registered by `cfstudio-runner install`. */
 const HOST = 'com.cfstudio.runner';
@@ -18,6 +18,7 @@ export interface Toolchains {
 
 type HostMessage =
   | { type: 'hello'; version: string; toolchains: Toolchains }
+  | { type: 'saved'; path: string }
   | RunEvent
   | { type: 'done' }
   | { type: 'error'; message: string };
@@ -84,11 +85,16 @@ export class NativeRunner implements Runner {
         else if (msg.type === 'error') finish(new Error(msg.message));
       });
       port.onDisconnect.addListener(() => finish(new Error(explain(chrome.runtime.lastError?.message))));
-      port.postMessage({ type: 'run', ...req });
+      port.postMessage({ type: req.interactor ? 'interact' : 'run', ...req });
     });
   }
 
-  /** Send one request and wait for the reply of the given type. */
+  async save(req: SaveRequest): Promise<string> {
+    const reply = await this.exchange<{ type: 'saved'; path: string }>({ type: 'save', ...req }, 'saved', 10_000);
+    return reply.path;
+  }
+
+  /** Send one request and wait for the reply of the given type (or an error). */
   private exchange<T>(request: object, replyType: string, timeoutMs: number): Promise<T> {
     return new Promise((resolve, reject) => {
       const port = chrome.runtime.connectNative(HOST);
@@ -97,10 +103,11 @@ export class NativeRunner implements Runner {
         reject(new Error('The runner did not answer.'));
       }, timeoutMs);
       port.onMessage.addListener((msg: HostMessage) => {
-        if (msg.type !== replyType) return;
+        if (msg.type !== replyType && msg.type !== 'error') return;
         clearTimeout(timer);
         port.disconnect();
-        resolve(msg as T);
+        if (msg.type === 'error') reject(new Error(msg.message));
+        else resolve(msg as T);
       });
       port.onDisconnect.addListener(() => {
         clearTimeout(timer);

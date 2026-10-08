@@ -124,3 +124,52 @@ export function judge(ev: TestEvent, expected: string, opts: CheckOptions, timeL
     ? { ...base, verdict: 'DIFF', badLines: r.badLines, message: `${r.message}. This problem accepts any valid answer, so check yours by hand.${cut}` }
     : { ...base, verdict: 'WA', badLines: r.badLines, message: r.message + cut };
 }
+
+/** First non-empty line, for a short message. */
+function firstLine(s: string): string {
+  return s.split('\n').map((l) => l.trim()).find(Boolean) ?? '';
+}
+
+/**
+ * Verdict of an interactive run. The solution's own failures come first (like on Codeforces),
+ * then the interactor's exit code: 0 accepted, anything else wrong answer, with its stderr as the
+ * reason (testlib: 1 WA, 2 presentation error, 3 interactor failure).
+ */
+export function judgeInteraction(ev: TestEvent, timeLimitMs: number): TestResult {
+  const inter = ev.interactor;
+  const base = {
+    stdout: '',
+    stderr: ev.stderr,
+    exitCode: ev.exitCode,
+    timeMs: ev.timeMs,
+    memoryKb: ev.memoryKb,
+    badLines: [],
+    message: '',
+    transcript: ev.transcript ?? [],
+    interactorLog: inter?.stderr ?? '',
+  };
+  const said = firstLine(inter?.stderr ?? '');
+  if (ev.idle) {
+    return {
+      ...base,
+      verdict: 'TLE',
+      message: 'Idleness limit exceeded: your program was waiting for input. Flush the output after every query.',
+    };
+  }
+  if (ev.timedOut) return { ...base, verdict: 'TLE', message: `Stopped after the ${timeLimitMs} ms time limit` };
+  if (ev.memoryExceeded) return { ...base, verdict: 'MLE', message: 'Used more memory than the limit' };
+  const stopped = ev.exitCode === null && Boolean(ev.detail?.startsWith('stopped'));
+  if (ev.exitCode !== 0 && !stopped) {
+    const why = ev.detail ? `Crashed: ${ev.detail}` : `Exited with code ${ev.exitCode ?? '(killed)'}`;
+    return { ...base, verdict: 'RE', message: why };
+  }
+  if (!inter || inter.timedOut || inter.exitCode === null) {
+    return { ...base, verdict: 'WA', message: "The interactor didn't finish (it may be waiting for more output from your program)." };
+  }
+  if (inter.exitCode === 3) return { ...base, verdict: 'WA', message: `The interactor failed (exit code 3)${said ? `: ${said}` : ''}` };
+  if (inter.exitCode !== 0) {
+    return { ...base, verdict: 'WA', message: said || `The interactor exited with code ${inter.exitCode}` };
+  }
+  const note = stopped ? 'Your program kept running after the interaction ended and was stopped.' : '';
+  return { ...base, verdict: 'AC', message: [said, note].filter(Boolean).join(' · ') };
+}

@@ -3,9 +3,9 @@
 package main
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"os/exec"
 	"syscall"
 	"time"
@@ -28,12 +28,12 @@ type jobAccounting struct {
 	TotalTerminatedProcesses  uint32
 }
 
-// runLimited runs args in dir with stdin, inside a Job Object that enforces the CPU-time and
-// memory limits for the process *and* anything it spawns, and kills all of it when we're done.
+// runLimitedIO runs args in dir inside a Job Object that enforces the CPU-time and memory limits
+// for the process *and* anything it spawns, and kills all of it when we're done.
 //
 // The process starts suspended and is only resumed once it is in the job, so it can't allocate
 // or spawn anything outside the limits first.
-func runLimited(args []string, dir string, stdin []byte, lim limits, outCap, errCap int) (execResult, error) {
+func runLimitedIO(args []string, dir string, lim limits, stdin io.Reader, stdout, stderr io.Writer) (execResult, error) {
 	job, err := windows.CreateJobObject(nil, nil)
 	if err != nil {
 		return execResult{}, fmt.Errorf("create job object: %w", err)
@@ -54,11 +54,9 @@ func runLimited(args []string, dir string, stdin []byte, lim limits, outCap, err
 		return execResult{}, fmt.Errorf("set job limits: %w", err)
 	}
 
-	stdout := &cappedBuffer{max: outCap}
-	stderr := &cappedBuffer{max: errCap}
 	cmd := exec.Command(args[0], args[1:]...)
 	cmd.Dir = dir
-	cmd.Stdin = bytes.NewReader(stdin)
+	cmd.Stdin = stdin
 	cmd.Stdout = stdout
 	cmd.Stderr = stderr
 	cmd.SysProcAttr = &syscall.SysProcAttr{
@@ -95,12 +93,18 @@ func runLimited(args []string, dir string, stdin []byte, lim limits, outCap, err
 	tick := time.NewTicker(20 * time.Millisecond)
 	defer tick.Stop()
 	limitHit := false
+	stopped := false
+	stop := lim.stop
 	var waitErr error
 wait:
 	for {
 		select {
 		case waitErr = <-done:
 			break wait
+		case <-stop:
+			stop = nil
+			stopped = true
+			_ = windows.TerminateJobObject(job, 1)
 		case <-wall:
 			limitHit = true
 			_ = windows.TerminateJobObject(job, 1)
@@ -121,14 +125,14 @@ wait:
 		uintptr(unsafe.Pointer(&ext)), uint32(unsafe.Sizeof(ext)), nil)
 
 	res := execResult{
-		stdout:     stdout.buf.Bytes(),
-		stderr:     stderr.buf.Bytes(),
-		truncated:  stdout.truncated || stderr.truncated,
 		exitCode:   int(uint32(cmd.ProcessState.ExitCode())),
 		cpuTime:    jobCPUTime(job),
 		peakMemory: uint64(ext.PeakJobMemoryUsed),
 	}
+	res.stopped = stopped && !limitHit
 	res.timedOut = limitHit || (lim.cpuTime > 0 && res.cpuTime >= lim.cpuTime)
+	// Killed by the wall clock while hardly using the CPU: it was waiting (for input, usually).
+	res.idle = limitHit && lim.cpuTime > 0 && res.cpuTime < lim.cpuTime
 	// At the job memory limit allocations fail, so the program dies (bad_alloc, MemoryError, …)
 	// with its peak right at the limit.
 	res.memoryExceeded = lim.memory > 0 && res.exitCode != 0 && res.peakMemory+(2<<20) >= lim.memory

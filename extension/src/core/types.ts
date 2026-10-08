@@ -1,3 +1,5 @@
+import type { TranscriptChunk } from './runner';
+
 /** A problem as read from a Codeforces problem page. HTML fields are already sanitized. */
 export interface Problem {
   /** Stable key, e.g. "1234A" or "gym100001A". */
@@ -60,4 +62,8 @@ export interface TestResult {
   badLines: number[];
   /** Human-readable explanation of a WA, e.g. "line 2: expected 3, found 4". */
   message: string;
+  /** Interactive runs: what the solution and the interactor said to each other. */
+  transcript?: TranscriptChunk[];
+  /** Interactive runs: what the interactor wrote to stderr. */
+  interactorLog?: string;
 }

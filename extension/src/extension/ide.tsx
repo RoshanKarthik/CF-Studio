@@ -1,5 +1,7 @@
-import { StrictMode, useEffect, useMemo, useState } from 'react';
+import { StrictMode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
+import type { ContestInfo } from '../core/contest';
+import { contestClock } from '../core/contest';
 import { parseProblemPage } from '../core/parseProblem';
 import type { Problem } from '../core/types';
 import { App } from '../ui/App';
@@ -11,7 +13,7 @@ import { ChromeStorageKV } from './chromeKV';
 import type { IdeMessage, PageMessage } from './messages';
 import { isCodeforcesOrigin } from './messages';
 import { NativeRunner } from './nativeRunner';
-import { PageJudge } from './pageJudge';
+import { PageBridge } from './pageBridge';
 
 const kv = new ChromeStorageKV();
 const parentOrigin = location.ancestorOrigins?.[0] ?? '';
@@ -22,16 +24,55 @@ function send(msg: IdeMessage) {
   window.parent.postMessage(msg, parentOrigin);
 }
 
-const judge = new PageJudge(parentOrigin, send);
+const judge = new PageBridge(parentOrigin, send);
 
 function Boot({ text }: { text: string }) {
   return <div className="boot">{text}</div>;
 }
 
-function IdeRoot({ problems, startIndex }: { problems: Problem[]; startIndex: string | null }) {
+function IdeRoot({ initialProblems, startIndex, pageUrl }: { initialProblems: Problem[]; startIndex: string | null; pageUrl: string }) {
+  const [problems, setProblems] = useState(initialProblems);
   const [currentId, setCurrentId] = useState(
     () => problems.find((p) => p.index === startIndex)?.id ?? problems[0].id,
   );
+  const [contest, setContest] = useState<ContestInfo | null>(null);
+  const [loadingAll, setLoadingAll] = useState(false);
+  const isContestPage = !new URL(pageUrl).pathname.startsWith('/problemset/');
+
+  // Contest mode: the other problems' statements come from the contest's /problems page (one
+  // request). Problems already open keep their objects (and so their tags and state).
+  const loadAll = useCallback(async () => {
+    setLoadingAll(true);
+    try {
+      const { url, html } = await judge.allProblems();
+      // Parsed (and sanitized) here, like the first page.
+      const all = parseProblemPage(new DOMParser().parseFromString(html, 'text/html'), url);
+      if (!all.length) throw new Error("Couldn't read the contest's problems.");
+      setProblems((cur) => {
+        const merged = all.map((p) => cur.find((c) => c.id === p.id) ?? p);
+        for (const c of cur) if (!merged.some((p) => p.id === c.id)) merged.push(c);
+        return merged;
+      });
+    } finally {
+      setLoadingAll(false);
+    }
+  }, []);
+
+  const started = useRef(false);
+  useEffect(() => {
+    if (started.current || !isContestPage) return;
+    started.current = true;
+    judge.contest().then(
+      (info) => {
+        setContest(info);
+        // During the contest, open every problem's tab right away.
+        if (info && contestClock(info, Date.now()).kind === 'running' && initialProblems.length === 1) {
+          void loadAll().catch(() => {});
+        }
+      },
+      () => {},
+    );
+  }, [isContestPage, loadAll, initialProblems.length]);
   const problem = problems.find((p) => p.id === currentId) ?? problems[0];
   const [loaded, setLoaded] = useState<{ id: string; state: InitialState } | null>(null);
 
@@ -51,8 +92,10 @@ function IdeRoot({ problems, startIndex }: { problems: Problem[]; startIndex: st
     () => ({
       problems: problems.map((p) => ({ id: p.id, index: p.index, title: p.title })),
       onSelect: setCurrentId,
+      onLoadAll: isContestPage && problems.length === 1 ? loadAll : undefined,
+      loadingAll,
     }),
-    [problems],
+    [problems, isContestPage, loadAll, loadingAll],
   );
 
   if (!loaded || loaded.id !== problem.id) return <Boot text="Loading…" />;
@@ -64,6 +107,7 @@ function IdeRoot({ problems, startIndex }: { problems: Problem[]; startIndex: st
       kv={kv}
       initial={loaded.state}
       judge={judge}
+      contest={contest}
       onExit={() => send({ type: 'cfs:close' })}
       nav={nav}
     />
@@ -95,7 +139,7 @@ if (!isCodeforcesOrigin(parentOrigin)) {
     }
     root.render(
       <StrictMode>
-        <IdeRoot problems={problems} startIndex={typeof index === 'string' ? index : null} />
+        <IdeRoot initialProblems={problems} startIndex={typeof index === 'string' ? index : null} pageUrl={url} />
       </StrictMode>,
     );
   });

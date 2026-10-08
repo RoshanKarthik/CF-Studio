@@ -2,17 +2,17 @@ import { describe, expect, it } from 'vitest';
 import { SubmitError } from '../src/core/judge';
 import type { Problem } from '../src/core/types';
 import type { IdeMessage } from '../src/extension/messages';
-import { PageJudge } from '../src/extension/pageJudge';
+import { PageBridge } from '../src/extension/pageBridge';
 
 const problem = { id: '1000B', contestId: '1000', index: 'B', url: 'https://codeforces.com/contest/1000/problem/B' } as Problem;
 
 function setup() {
   const sent: IdeMessage[] = [];
-  const judge = new PageJudge('https://codeforces.com', (m) => sent.push(m));
+  const judge = new PageBridge('https://codeforces.com', (m) => sent.push(m));
   return { judge, sent };
 }
 
-describe('PageJudge', () => {
+describe('PageBridge', () => {
   it('sends a submit request and resolves with the submission id', async () => {
     const { judge, sent } = setup();
     const p = judge.submit(problem, 'cpp20', 'int main() {}');
@@ -58,6 +58,26 @@ describe('PageJudge', () => {
     expect(r.handle).toBe('test_user');
     expect(r.items.map((s) => s.id)).toEqual([5]);
     expect(judge.submissionUrl(r.items[0])).toBe('https://codeforces.com/contest/1000/submission/5');
+  });
+
+  it('reads contest timing and accepts only the contest problems page', async () => {
+    const { judge, sent } = setup();
+    const c = judge.contest();
+    judge.handle({
+      type: 'cfs:contest-result',
+      id: 1,
+      ok: true,
+      data: { status: 'OK', result: { contest: { name: 'R', phase: 'CODING', durationSeconds: 7200, relativeTimeSeconds: 60 } } },
+    });
+    await expect(c).resolves.toMatchObject({ phase: 'CODING', relativeTimeSeconds: 60 });
+
+    const ok = judge.allProblems();
+    judge.handle({ type: 'cfs:problems-result', id: 2, ok: true, url: 'https://codeforces.com/contest/1000/problems', html: '<div></div>' });
+    await expect(ok).resolves.toEqual({ url: 'https://codeforces.com/contest/1000/problems', html: '<div></div>' });
+    const elsewhere = judge.allProblems();
+    judge.handle({ type: 'cfs:problems-result', id: 3, ok: true, url: 'https://evil.example/contest/1000/problems', html: '' });
+    await expect(elsewhere).rejects.toThrow('Unexpected problems page address');
+    expect(sent.map((m) => m.type)).toEqual(['cfs:contest', 'cfs:problems', 'cfs:problems']);
   });
 
   it('reports a logged-out user and builds the login link itself', async () => {

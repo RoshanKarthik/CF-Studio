@@ -791,17 +791,68 @@ body:has(.splitter.dragging) {
   flex: none;
 }
 
+.file-tabs {
+  align-self: stretch;
+  display: flex;
+  align-items: stretch;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
 .file-tab {
   align-self: stretch;
   display: inline-flex;
   align-items: center;
   gap: 8px;
   padding: 0 16px;
-  background: var(--panel);
+  background: transparent;
   border-right: 1px solid var(--border);
   font: 600 13px var(--font-mono);
-  color: var(--text);
+  color: var(--muted);
   position: relative;
+  white-space: nowrap;
+}
+
+.file-tab:hover {
+  color: var(--text-2);
+}
+
+.file-tab.active {
+  background: var(--panel);
+  color: var(--text);
+}
+
+.file-close {
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  margin-right: -6px;
+  border-radius: 5px;
+  color: var(--muted);
+  opacity: 0;
+}
+
+.file-tab:hover .file-close,
+.file-tab.active .file-close {
+  opacity: 1;
+}
+
+.file-close:hover {
+  background: var(--raised-2);
+  color: var(--text);
+}
+
+.file-add {
+  display: flex;
+  align-items: center;
+  padding: 0 6px;
+}
+
+.file-tab:not(.active)::before,
+.file-tab:not(.active)::after {
+  display: none;
 }
 
 .file-tab::before {
@@ -1475,6 +1526,123 @@ body:has(.splitter.dragging) {
   font-weight: 600;
 }
 
+/* ================================================================ interactive, stress */
+
+.notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--accent-soft);
+  color: var(--text-2);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.btn.small {
+  height: 28px;
+  padding: 0 10px;
+  font-size: 12.5px;
+}
+
+.transcript {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.tr-turn {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+}
+
+.tr-turn pre {
+  margin: 0;
+  font: inherit;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.tr-who {
+  flex: none;
+  width: 72px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+.tr-turn.solution .tr-who {
+  color: var(--accent);
+}
+
+.tr-turn.interactor pre {
+  color: var(--text-2);
+}
+
+.stress-intro p {
+  max-width: 520px;
+}
+
+.stress-create {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+
+.stress-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+  font-size: 12.5px;
+}
+
+.seg {
+  display: inline-flex;
+  padding: 2px;
+  border-radius: 9px;
+  background: var(--inset);
+  border: 1px solid var(--border);
+}
+
+.seg button {
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 7px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.seg button.active {
+  background: var(--raised-2);
+  color: var(--text);
+}
+
+.stress-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0 12px;
+  font-size: 13px;
+  color: var(--text-2);
+}
+
+.stress-found {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 10px 0 4px;
+  font-size: 12.5px;
+}
+
 /* ================================================================ submissions */
 
 .topbar-center {
@@ -1482,6 +1650,30 @@ body:has(.splitter.dragging) {
   align-items: center;
   gap: 10px;
   min-width: 0;
+}
+
+.contest-clock {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font: 600 12.5px var(--font-mono);
+  white-space: nowrap;
+}
+
+.contest-clock.warn {
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+
+.contest-clock.muted-clock {
+  background: var(--raised);
+  color: var(--text-2);
+  font-family: var(--font-ui);
 }
 
 .live-verdict {
@@ -1844,6 +2036,34 @@ input[type='range']::-webkit-slider-thumb {
 
 .pref-row:last-child {
   border-bottom: 0;
+}
+
+.pref-row.column {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  cursor: default;
+}
+
+.text-input {
+  width: 100%;
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--inset);
+  color: var(--text);
+  font: 13px var(--font-mono);
+  outline: none;
+}
+
+.text-input:focus {
+  border-color: var(--accent);
+}
+
+.text-input.small {
+  width: 90px;
+  height: 30px;
 }
 
 .pref-text {

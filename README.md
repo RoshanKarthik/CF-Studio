@@ -45,7 +45,27 @@ bin/cfstudio-runner.exe doctor      # shows which compilers it found
 Restart the browser after installing. `cfstudio-runner uninstall` removes the registration; run
 `install` again if you move the folder. The runner compiles like Codeforces (`g++ -std=c++20 -O2
 -static`, 256 MB stack, `LOCAL` defined) and judges with the problem's CPU-time and memory limits
-inside a Windows Job Object, with no console windows.
+inside a Windows Job Object, with no console windows. Builds are cached in
+`%LOCALAPPDATA%\cfstudio\builds` (the 60 most recent), so running unchanged code skips the compiler.
+
+## Stress testing, interactive problems, contest mode
+
+- **Extra files.** The **+** next to `main.cpp` adds a generator, a brute force or an interactor,
+  each in any language (they start from a working example; the brute force from your template).
+  Run and Submit always use `main`.
+- **Stress tab.** Runs the generator (it reads a seed from stdin), your solution and the brute force
+  on 100 / 1,000 / 10,000 random tests and stops at the first difference, showing the input and
+  both outputs; **Add as custom test** keeps it.
+- **Interactive problems.** With an interactor, **Run** sends each Custom test to it: the interactor
+  gets the test file as `argv[1]` (testlib style, `registerInteraction(argc, argv)` works) and its
+  exit code is the verdict (0 = accepted). The test shows the whole conversation; a program that
+  waits without flushing gets "Idleness limit exceeded".
+- **Contest mode.** On a contest page the top bar shows the time left (from Codeforces' API
+  `contest.standings`); during a contest every problem opens as a tab (from the contest's
+  `/problems` page, one request), otherwise **All problems** does it on demand.
+- **Solutions on disk.** Settings → Practice → *Save solutions to a folder*: each solution is also
+  written to `<folder>\<contest>\<index>.<ext>`, e.g. `C:\cp\codeforces\1915\A.cpp`
+  (`gym100001\…` for gyms).
 
 ## Submitting
 

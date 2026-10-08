@@ -17,7 +17,11 @@ export type IdeMessage =
   /** Sent only after the user confirmed the submission in the IDE's dialog. */
   | { type: 'cfs:submit'; id: number; index: string; lang: LangId; code: string }
   /** The latest `count` entries of the user's `user.status`, filtered to this problem. */
-  | { type: 'cfs:status'; id: number; index: string; count: number };
+  | { type: 'cfs:status'; id: number; index: string; count: number }
+  /** Contest mode: the contest's phase and time (`contest.standings`, raw JSON). */
+  | { type: 'cfs:contest'; id: number }
+  /** Contest mode: the statements of all the contest's problems, from its /problems page. */
+  | { type: 'cfs:problems'; id: number };
 
 /** page → IDE: answer to `cfs:submit`. */
 export type SubmitReply =
@@ -29,13 +33,23 @@ export type StatusReply =
   | { type: 'cfs:status-result'; id: number; ok: true; handle: string | null; data: unknown }
   | { type: 'cfs:status-result'; id: number; ok: false; message: string };
 
+/** page → IDE: answer to `cfs:contest`. */
+export type ContestReply =
+  | { type: 'cfs:contest-result'; id: number; ok: true; data: unknown }
+  | { type: 'cfs:contest-result'; id: number; ok: false; message: string };
+
+/** page → IDE: answer to `cfs:problems`; `html` is parsed and sanitized by the IDE like the first page. */
+export type ProblemsReply =
+  | { type: 'cfs:problems-result'; id: number; ok: true; url: string; html: string }
+  | { type: 'cfs:problems-result'; id: number; ok: false; message: string };
+
 /** page → IDE: the IDE was shown or hidden (it stays loaded while hidden). */
 export interface VisibleMessage {
   type: 'cfs:visible';
   visible: boolean;
 }
 
-export type PageMessage = InitMessage | SubmitReply | StatusReply | VisibleMessage;
+export type PageMessage = InitMessage | SubmitReply | StatusReply | ContestReply | ProblemsReply | VisibleMessage;
 
 /** page → IDE */
 export interface InitMessage {
