@@ -62,6 +62,8 @@ export interface AppProps {
   judge: Judge;
   /** Close the IDE and show the Codeforces page (extension only). */
   onExit?: () => void;
+  /** Show this problem on Codeforces itself, not in another copy of the IDE (extension only). */
+  onShowOnCodeforces?: (problem: Problem) => void;
   /** Other problems of the same contest, when the page had several (or they were loaded). */
   nav?: {
     problems: { id: string; index: string; title: string }[];
@@ -106,7 +108,7 @@ function Logo() {
   );
 }
 
-export function App({ problem, runner, kv, initial, judge: cf, onExit, nav, contest }: AppProps) {
+export function App({ problem, runner, kv, initial, judge: cf, onExit, onShowOnCodeforces, nav, contest }: AppProps) {
   const [settings, setSettings] = useState<Settings>(initial.settings);
   const [layout, setLayout] = useState<Layout>(initial.layout);
   const [templates, setTemplates] = useState<TemplateStore>(initial.templates);
@@ -544,6 +546,7 @@ export function App({ problem, runner, kv, initial, judge: cf, onExit, nav, cont
                 showTags={settings.showTags}
                 onCollapse={() => setLayout((l) => ({ ...l, statementOpen: false }))}
                 onOpenSubmissions={() => submissions.list.status === 'idle' && void submissions.load()}
+                onShowOnCodeforces={onShowOnCodeforces && (() => onShowOnCodeforces(problem))}
                 submissions={
                   <SubmissionsPanel
                     state={submissions.list}

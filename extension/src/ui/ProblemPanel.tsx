@@ -44,10 +44,13 @@ export function ProblemPanel({
   onCollapse,
   submissions,
   onOpenSubmissions,
+  onShowOnCodeforces,
 }: {
   problem: Problem;
   showTags: boolean;
   onCollapse: () => void;
+  /** Extension: show the problem on Codeforces itself (else a plain link, in the preview). */
+  onShowOnCodeforces?: () => void;
   /** Content of the Submissions tab. */
   submissions: ReactNode;
   onOpenSubmissions: () => void;
@@ -75,9 +78,15 @@ export function ProblemPanel({
           </button>
         </div>
         <div className="pane-actions">
-          <a className="icon-btn" href={problem.url} target="_blank" rel="noopener noreferrer" title="Open on Codeforces">
-            <ExternalLink size={15} />
-          </a>
+          {onShowOnCodeforces ? (
+            <button className="icon-btn" onClick={onShowOnCodeforces} title="Show on Codeforces">
+              <ExternalLink size={15} />
+            </button>
+          ) : (
+            <a className="icon-btn" href={problem.url} target="_blank" rel="noopener noreferrer" title="Open on Codeforces">
+              <ExternalLink size={15} />
+            </a>
+          )}
           <button className="icon-btn" onClick={onCollapse} title="Hide statement (Ctrl+B)">
             <PanelLeftClose size={15} />
           </button>

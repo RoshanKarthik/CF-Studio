@@ -60,6 +60,13 @@ export interface InitMessage {
   index: string | null;
 }
 
+/**
+ * A Codeforces URL with this hash opens in the classic view: the IDE doesn't open by itself (the
+ * launcher button and Alt+I still work). Used by "Show on Codeforces" for problems other than the
+ * one the IDE was opened over.
+ */
+export const CLASSIC_VIEW_HASH = '#cf-studio=off';
+
 /** Codeforces and its mirrors (m1.codeforces.com, …). */
 export function isCodeforcesOrigin(origin: string): boolean {
   return /^https:\/\/([a-z0-9-]+\.)*codeforces\.com$/.test(origin);

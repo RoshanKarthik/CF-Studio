@@ -2,7 +2,7 @@ import { StrictMode, useCallback, useEffect, useMemo, useRef, useState } from 'r
 import { createRoot } from 'react-dom/client';
 import type { ContestInfo } from '../core/contest';
 import { contestClock } from '../core/contest';
-import { parseProblemPage } from '../core/parseProblem';
+import { parseProblemPage, parseProblemUrl } from '../core/parseProblem';
 import type { Problem } from '../core/types';
 import { App } from '../ui/App';
 import type { InitialState } from '../ui/state';
@@ -11,7 +11,7 @@ import { applyTheme } from '../ui/themes';
 import '../ui/styles.css';
 import { ChromeStorageKV } from './chromeKV';
 import type { IdeMessage, PageMessage } from './messages';
-import { isCodeforcesOrigin } from './messages';
+import { CLASSIC_VIEW_HASH, isCodeforcesOrigin } from './messages';
 import { NativeRunner } from './nativeRunner';
 import { PageBridge } from './pageBridge';
 
@@ -109,6 +109,18 @@ function IdeRoot({ initialProblems, startIndex, pageUrl }: { initialProblems: Pr
       judge={judge}
       contest={contest}
       onExit={() => send({ type: 'cfs:close' })}
+      onShowOnCodeforces={(p) => {
+        // The page under the IDE already shows this problem: just switch to it.
+        const page = parseProblemUrl(pageUrl);
+        if (page && (page.index === null || page.index === p.index)) {
+          send({ type: 'cfs:close' });
+          return;
+        }
+        // Another problem of the contest: its own page in a new tab, without the IDE on top.
+        const url = new URL(`/${p.kind}/${p.contestId}/problem/${p.index}`, pageUrl);
+        url.hash = CLASSIC_VIEW_HASH;
+        window.open(url.href, '_blank', 'noopener');
+      }}
       nav={nav}
     />
   );

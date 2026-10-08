@@ -6,6 +6,7 @@
 import { parseProblemUrl } from '../core/parseProblem';
 import * as codeforces from './codeforces';
 import type { IdeMessage, InitMessage, PageMessage } from './messages';
+import { CLASSIC_VIEW_HASH } from './messages';
 import { statementHtml } from './scrape';
 
 const LAUNCHER_CSS = `
@@ -159,7 +160,8 @@ function main() {
     }
   });
 
-  void shouldAutoOpen().then((yes) => (yes ? open() : launcher.show()));
+  if (location.hash === CLASSIC_VIEW_HASH) launcher.show();
+  else void shouldAutoOpen().then((yes) => (yes ? open() : launcher.show()));
 }
 
 main();
