@@ -165,3 +165,12 @@ func TestSave(t *testing.T) {
 		}
 	}
 }
+
+func TestCompilerReport(t *testing.T) {
+	r := compilerReport(toolchains{Cpp: &tool{Version: "g++ 13.2.0"}, Javac: &tool{}, Java: nil})
+	for _, want := range []string{"[ok]      C++      g++ 13.2.0", "[missing] Java", "[missing] Python", "adoptium.net"} {
+		if !strings.Contains(r, want) {
+			t.Errorf("report misses %q:\n%s", want, r)
+		}
+	}
+}

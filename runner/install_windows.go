@@ -5,8 +5,10 @@ package main
 import (
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"golang.org/x/sys/windows/registry"
 )
@@ -18,17 +20,80 @@ var browserKeys = map[string]string{
 	"Brave":  `Software\BraveSoftware\Brave-Browser\NativeMessagingHosts\` + hostName,
 }
 
-// install writes the host manifest next to the executable and points each browser at it.
-// Only HKEY_CURRENT_USER is touched, so no administrator rights are needed.
+// install registers this executable where it is (for development builds).
 func install(id string) error {
+	exe, err := selfPath()
+	if err != nil {
+		return err
+	}
+	return installAt(exe, id)
+}
+
+func selfPath() (string, error) {
 	exe, err := os.Executable()
 	if err != nil {
-		return err
+		return "", err
 	}
-	exe, err = filepath.Abs(exe)
+	return filepath.Abs(exe)
+}
+
+// setupDir is where a downloaded runner installs itself, so the download can be moved or deleted.
+func setupDir() string {
+	base := os.Getenv("LOCALAPPDATA")
+	if base == "" {
+		base, _ = os.UserConfigDir()
+	}
+	return filepath.Join(base, "Programs", "CF Studio")
+}
+
+// setup is what double-clicking the downloaded runner does: copy it to a fixed per-user folder
+// and register that copy. No administrator rights are needed.
+func setup(id string) error {
+	self, err := selfPath()
 	if err != nil {
 		return err
 	}
+	dir := setupDir()
+	target := filepath.Join(dir, "cfstudio-runner.exe")
+	if !strings.EqualFold(self, target) {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			return err
+		}
+		// A runner started by the browser keeps its exe locked; Windows still lets it be renamed.
+		old := target + ".old"
+		_ = os.Remove(old)
+		if exists(target) {
+			if err := os.Rename(target, old); err != nil {
+				return fmt.Errorf("couldn't replace the installed runner (close the browser and try again): %w", err)
+			}
+		}
+		if err := copyFile(self, target); err != nil {
+			return err
+		}
+	}
+	return installAt(target, id)
+}
+
+func copyFile(from, to string) error {
+	in, err := os.Open(from)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+	out, err := os.OpenFile(to, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o755)
+	if err != nil {
+		return err
+	}
+	if _, err := io.Copy(out, in); err != nil {
+		out.Close()
+		return err
+	}
+	return out.Close()
+}
+
+// installAt writes the host manifest next to exe and points each browser at it.
+// Only HKEY_CURRENT_USER is touched, so no administrator rights are needed.
+func installAt(exe, id string) error {
 	manifest, err := hostManifest(exe, id)
 	if err != nil {
 		return err

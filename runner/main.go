@@ -28,10 +28,23 @@ func main() {
 		}
 		return
 	}
-	cmd := ""
-	if len(args) > 0 {
-		cmd = args[0]
+	if len(args) == 0 {
+		// Double-clicked (Chrome always passes an argument): install for this user.
+		err := setup(extensionID)
+		if err == nil {
+			fmt.Println()
+			fmt.Print(compilerReport(detectToolchains()))
+		} else {
+			fmt.Println("Couldn't install the CF Studio runner:", err)
+		}
+		fmt.Print("\nPress Enter to close.")
+		_, _ = fmt.Scanln()
+		if err != nil {
+			os.Exit(1)
+		}
+		return
 	}
+	cmd := args[0]
 	var err error
 	switch cmd {
 	case "install":
@@ -49,7 +62,8 @@ func main() {
 		fmt.Println(version)
 	default:
 		fmt.Println("cfstudio-runner " + version + "\n\n" +
-			"  install [extension-id]   register with Chrome, Edge and Brave for the current user\n" +
+			"  (no arguments)           install for this user (copies itself to %LOCALAPPDATA%\\Programs\\CF Studio)\n" +
+			"  install [extension-id]   register this exe where it is, with Chrome, Edge and Brave\n" +
 			"  uninstall                remove that registration\n" +
 			"  doctor                   show which compilers were found")
 	}
@@ -57,6 +71,26 @@ func main() {
 		fmt.Fprintln(os.Stderr, "error:", err)
 		os.Exit(1)
 	}
+}
+
+// compilerReport lists, in plain words, which compilers were found and what to install otherwise.
+func compilerReport(tc toolchains) string {
+	line := func(name string, t *tool, missing string) string {
+		if t != nil {
+			return fmt.Sprintf("  [ok]      %-8s %s\n", name, t.Version)
+		}
+		return fmt.Sprintf("  [missing] %-8s %s\n", name, missing)
+	}
+	java := tc.Java
+	if tc.Javac == nil {
+		java = nil
+	}
+	return "Compilers found on this computer (CF Studio uses whatever is on PATH):\n" +
+		line("C++", tc.Cpp, "install GCC for Windows, e.g. from winlibs.com, and add its bin folder to PATH") +
+		line("Java", java, "install a JDK 21+, e.g. Eclipse Temurin (adoptium.net)") +
+		line("Python", tc.Python, `install Python 3 from python.org and tick "Add python.exe to PATH"`) +
+		line("PyPy", tc.Pypy, "optional: install PyPy 3 from pypy.org and add it to PATH") +
+		"You only need the ones you use. After installing one, restart the browser.\n"
 }
 
 // hostManifest is the native messaging manifest Chrome reads to find and authorize the runner.
