@@ -113,12 +113,14 @@ export function judge(ev: TestEvent, expected: string, opts: CheckOptions, timeL
   if (ev.timedOut) return { ...base, verdict: 'TLE', message: `Stopped after the ${timeLimitMs} ms time limit` };
   if (ev.memoryExceeded) return { ...base, verdict: 'MLE', message: 'Used more memory than the limit' };
   if (ev.exitCode !== 0) {
-    return { ...base, verdict: 'RE', message: `Exited with code ${ev.exitCode ?? '(killed)'}` };
+    const why = ev.detail ? `Crashed: ${ev.detail}` : `Exited with code ${ev.exitCode ?? '(killed)'}`;
+    return { ...base, verdict: 'RE', message: why };
   }
-  if (!expected.trim()) return { ...base, verdict: 'OK' };
+  if (!expected.trim()) return { ...base, verdict: 'OK', message: ev.truncated ? 'Output was cut off (too long to show)' : '' };
   const r = compareOutput(expected, ev.stdout, opts);
   if (r.ok) return { ...base, verdict: 'AC' };
+  const cut = ev.truncated ? ' (your output was cut off, so this may be wrong)' : '';
   return opts.multipleAnswers
-    ? { ...base, verdict: 'DIFF', badLines: r.badLines, message: `${r.message}. This problem accepts any valid answer, so check yours by hand.` }
-    : { ...base, verdict: 'WA', badLines: r.badLines, message: r.message };
+    ? { ...base, verdict: 'DIFF', badLines: r.badLines, message: `${r.message}. This problem accepts any valid answer, so check yours by hand.${cut}` }
+    : { ...base, verdict: 'WA', badLines: r.badLines, message: r.message + cut };
 }

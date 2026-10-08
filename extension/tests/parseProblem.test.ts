@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseMemoryLimit, parseProblemPage, parseProblemUrl, parseTimeLimit, sanitize } from '../src/core/parseProblem';
+import { parseMemoryLimit, parseProblemPage, parseProblemUrl, parseTimeLimit, restoreTex, sanitize } from '../src/core/parseProblem';
 import FIXTURE from '../src/preview/fixture.html?raw';
 
 const URL_A = 'https://codeforces.com/contest/2001/problem/A';
@@ -111,5 +111,43 @@ describe('sanitize', () => {
 
   it('unwraps unknown tags but keeps their text', () => {
     expect(clean('<font color="red">hot</font>')).toBe('hot');
+  });
+});
+
+describe('restoreTex', () => {
+  it('turns MathJax output on a live page back into $$$ TeX', () => {
+    const el = doc(`<div id="x"><p>Let <span class="MathJax_Preview"></span><span class="MathJax" id="MathJax-Element-1-Frame"><nobr>n</nobr></span><script type="math/tex" id="MathJax-Element-1">n \le 10^5</script> hold.</p>
+      <div class="MathJax_Display"><span>sum</span></div><script type="math/tex; mode=display">\sum a_i</script></div>`).getElementById('x')!;
+    restoreTex(el);
+    expect(el.textContent?.replace(/\s+/g, ' ').trim()).toBe('Let $$$n \le 10^5$$$ hold. $$$$$$\sum a_i$$$$$$');
+  });
+
+  it('parses a MathJax-rendered page like the raw one', () => {
+    const rendered = FIXTURE.replace(
+      'contains $$$n$$$ integers',
+      'contains <span class="MathJax_Preview"></span><span class="MathJax"><nobr>n</nobr></span><script type="math/tex">n</script> integers',
+    );
+    const [raw] = parseProblemPage(doc(FIXTURE), URL_A);
+    const [live] = parseProblemPage(doc(rendered), URL_A);
+    expect(live.inputHtml.replace(/\s+/g, ' ')).toBe(raw.inputHtml.replace(/\s+/g, ' '));
+  });
+});
+
+describe('input/output files', () => {
+  const page = (input: string, output: string, cls = '') =>
+    parseProblemPage(
+      doc(`<div class="problem-statement"><div class="header"><div class="title">A. X</div>
+        <div class="input-file ${cls}"><div class="property-title">input</div>${input}</div>
+        <div class="output-file"><div class="property-title">output</div>${output}</div></div><div><p>x</p></div></div>`),
+      URL_A,
+    )[0];
+
+  it('treats "stdin"/"stdout" and the standard class as standard I/O', () => {
+    expect(page('stdin', 'stdout')).toMatchObject({ inputFile: 'standard input', outputFile: 'standard output' });
+    expect(page('whatever', 'standard output', 'input-standard').inputFile).toBe('standard input');
+  });
+
+  it('keeps real file names', () => {
+    expect(page('input.txt', 'output.txt')).toMatchObject({ inputFile: 'input.txt', outputFile: 'output.txt' });
   });
 });

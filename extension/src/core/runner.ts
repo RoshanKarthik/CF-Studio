@@ -25,6 +25,10 @@ export interface TestEvent {
   memoryKb: number;
   timedOut: boolean;
   memoryExceeded: boolean;
+  /** Names a crash, e.g. "stack overflow" (Go runner). */
+  detail?: string;
+  /** Output was longer than the runner keeps and was cut off. */
+  truncated?: boolean;
 }
 
 export type RunEvent = CompileEvent | TestEvent;

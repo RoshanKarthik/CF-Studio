@@ -179,6 +179,12 @@ export function SettingsDialog({
                 onChange={(v) => set('autoStartTimer', v)}
               />
               <Toggle
+                label="Open CF Studio automatically on problem pages"
+                hint="Otherwise use the CF Studio button or Alt+I"
+                checked={settings.autoOpen}
+                onChange={(v) => set('autoOpen', v)}
+              />
+              <Toggle
                 label="Always show tags and rating"
                 hint="Hidden by default so they don't hint at the solution"
                 checked={settings.showTags}

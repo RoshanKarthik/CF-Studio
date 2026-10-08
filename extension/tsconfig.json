@@ -14,10 +14,10 @@
     "isolatedModules": true,
     "verbatimModuleSyntax": true,
     "noEmit": true,
-    "types": ["vite/client", "node"],
+    "types": ["vite/client", "node", "chrome"],
     "paths": {
       "monaco-esm/*": ["./node_modules/monaco-editor/esm/vs/*"]
     }
   },
-  "include": ["src", "tests", "vite.config.ts"]
+  "include": ["src", "tests", "vite.config.ts", "vite.content.config.ts"]
 }

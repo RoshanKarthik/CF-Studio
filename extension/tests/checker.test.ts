@@ -60,3 +60,16 @@ describe('judge', () => {
     expect(judge(ev, '4', { ...EXACT, multipleAnswers: true }, 1000).verdict).toBe('DIFF');
   });
 });
+
+describe('judge with runner details', () => {
+  const ev = { type: 'test' as const, id: 's0', stdout: '3\n', stderr: '', exitCode: 0, timeMs: 5, memoryKb: 900, timedOut: false, memoryExceeded: false };
+
+  it('names the crash when the runner knows it', () => {
+    const r = judge({ ...ev, exitCode: -1073741571, detail: 'stack overflow' }, '3', EXACT, 1000);
+    expect(r).toMatchObject({ verdict: 'RE', message: 'Crashed: stack overflow' });
+  });
+
+  it('warns that a WA on truncated output may be wrong', () => {
+    expect(judge({ ...ev, stdout: '4', truncated: true }, '3', EXACT, 1000).message).toMatch(/cut off/);
+  });
+});

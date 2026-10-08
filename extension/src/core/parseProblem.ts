@@ -40,11 +40,29 @@ export function parseProblemPage(doc: Document, url: string): Problem[] {
   if (!ref) return [];
   const statements = [...doc.querySelectorAll<HTMLElement>('.problem-statement')];
   const sidebar = statements.length === 1 ? parseSidebar(doc) : { tags: [], rating: null };
-  return statements.map((el) => {
-    const holder = el.closest('[problemindex]');
+  return statements.map((original) => {
+    const holder = original.closest('[problemindex]');
+    const el = original.cloneNode(true) as HTMLElement;
+    restoreTex(el);
     const index = (holder?.getAttribute('problemindex') ?? ref.index ?? titleIndex(el) ?? '?').toUpperCase();
     return parseStatement(el, { ...ref, index }, url, sidebar);
   });
+}
+
+const MATHJAX_OUTPUT = '.MathJax_Preview, .MathJax, .MathJax_Display, .MathJax_SVG, .MathJax_SVG_Display, .MathJax_CHTML, mjx-container';
+
+/**
+ * On a live page MathJax has already replaced `$$$x$$$` with rendered markup plus a
+ * `<script type="math/tex">x</script>` holding the source. Put the `$$$` text back so the
+ * statement parses the same whether it comes from raw HTML or the rendered page.
+ */
+export function restoreTex(root: Element): void {
+  for (const node of root.querySelectorAll(MATHJAX_OUTPUT)) node.remove();
+  for (const script of root.querySelectorAll('script[type^="math/tex"]')) {
+    const display = /mode\s*=\s*display/.test(script.getAttribute('type') ?? '');
+    const tex = script.textContent ?? '';
+    script.replaceWith(display ? `$$$$$$${tex}$$$$$$` : `$$$${tex}$$$`);
+  }
 }
 
 function titleIndex(el: HTMLElement): string | null {
@@ -97,8 +115,8 @@ function parseStatement(
     title: text(header?.querySelector('.title')) || `${ref.index}.`,
     timeLimitMs: parseTimeLimit(propertyValue(header, '.time-limit')),
     memoryLimitMb: parseMemoryLimit(propertyValue(header, '.memory-limit')),
-    inputFile: propertyValue(header, '.input-file') || 'standard input',
-    outputFile: propertyValue(header, '.output-file') || 'standard output',
+    inputFile: ioFile(header, 'input'),
+    outputFile: ioFile(header, 'output'),
     legendHtml: sections.legend,
     inputHtml: sections.input,
     outputHtml: sections.output,
@@ -118,6 +136,18 @@ function propertyValue(header: Element | null | undefined, selector: string): st
   const clone = row.cloneNode(true) as Element;
   clone.querySelector('.property-title')?.remove();
   return text(clone);
+}
+
+/**
+ * "standard input"/"standard output", or the file name. Codeforces writes standard I/O as either
+ * "standard input" or "stdin", and marks it with an `input-standard` class.
+ */
+function ioFile(header: Element | null | undefined, kind: 'input' | 'output'): string {
+  const standard = `standard ${kind}`;
+  const row = header?.querySelector(`.${kind}-file`);
+  const value = propertyValue(header, `.${kind}-file`);
+  if (!row || row.classList.contains(`${kind}-standard`) || !value) return standard;
+  return /^(standard (input|output)|std(in|out))$/i.test(value) ? standard : value;
 }
 
 export function parseTimeLimit(value: string): number {

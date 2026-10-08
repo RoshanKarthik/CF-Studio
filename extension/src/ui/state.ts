@@ -19,6 +19,8 @@ export interface Settings {
   autoStartTimer: boolean;
   /** Show tags and rating without clicking to reveal them. */
   showTags: boolean;
+  /** Extension: open the IDE as soon as a problem page loads (else via the launcher / Alt+I). */
+  autoOpen: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -31,6 +33,7 @@ export const DEFAULT_SETTINGS: Settings = {
   ligatures: false,
   autoStartTimer: true,
   showTags: false,
+  autoOpen: true,
 };
 
 export interface Layout {

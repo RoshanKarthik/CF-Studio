@@ -12,6 +12,7 @@ import {
   Settings as SettingsIcon,
   Star,
   Wand2,
+  X,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { checkOptionsFor, judge } from '../core/checker';
@@ -47,6 +48,10 @@ export interface AppProps {
   initial: InitialState;
   /** Send the code to Codeforces; resolves with a message to show, rejects on failure. */
   submit: (lang: LangId, code: string) => Promise<string>;
+  /** Close the IDE and show the Codeforces page (extension only). */
+  onExit?: () => void;
+  /** Other problems of the same contest, when the page had several. */
+  nav?: { problems: { id: string; index: string; title: string }[]; onSelect: (id: string) => void };
 }
 
 type Dialog =
@@ -78,7 +83,7 @@ function Logo() {
   );
 }
 
-export function App({ problem, runner, kv, initial, submit }: AppProps) {
+export function App({ problem, runner, kv, initial, submit, onExit, nav }: AppProps) {
   const [settings, setSettings] = useState<Settings>(initial.settings);
   const [layout, setLayout] = useState<Layout>(initial.layout);
   const [templates, setTemplates] = useState<TemplateStore>(initial.templates);
@@ -346,6 +351,20 @@ export function App({ problem, runner, kv, initial, submit }: AppProps) {
             <ChevronRight size={14} />
             <span className="crumb-muted">{contestLabel}</span>
             <ChevronRight size={14} />
+            {nav && nav.problems.length > 1 && (
+              <span className="problem-tabs">
+                {nav.problems.map((p) => (
+                  <button
+                    key={p.id}
+                    className={p.id === problem.id ? 'active' : ''}
+                    title={p.title}
+                    onClick={() => p.id !== problem.id && nav.onSelect(p.id)}
+                  >
+                    {p.index}
+                  </button>
+                ))}
+              </span>
+            )}
             <span className="crumb-title">{problem.title}</span>
           </span>
         </div>
@@ -380,6 +399,11 @@ export function App({ problem, runner, kv, initial, submit }: AppProps) {
           >
             {fullscreen ? <Minimize2 size={17} /> : <Maximize2 size={17} />}
           </button>
+          {onExit && (
+            <button className="icon-btn" onClick={onExit} title="Back to the Codeforces page (Alt+I)">
+              <X size={18} />
+            </button>
+          )}
         </div>
       </header>
 
