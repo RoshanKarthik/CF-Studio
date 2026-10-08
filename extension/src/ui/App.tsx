@@ -23,6 +23,7 @@ import type { HelperKind, Helpers } from '../core/helpers';
 import { HELPER_KINDS, HELPER_LABEL, helperFileName, helperTemplate } from '../core/helpers';
 import type { Judge } from '../core/judge';
 import type { Family, LangId } from '../core/languages';
+import { RELEASES_URL } from '../core/links';
 import { isFullPath, mirrorPath } from '../core/mirror';
 import { FAMILY_LABEL, LANGUAGES, language } from '../core/languages';
 import type { Runner, RunnerStatus } from '../core/runner';
@@ -519,6 +520,11 @@ export function App({ problem, runner, kv, initial, judge: cf, onExit, onShowOnC
             <span className="dot" />
             <span className="runner-text">{runnerStatus ? runnerStatus.detail : 'Checking runner…'}</span>
           </span>
+          {runnerStatus?.remote && (
+            <a className="install-link" href={RELEASES_URL} target="_blank" rel="noopener noreferrer" title="Download the CF Studio runner to run tests on this computer">
+              Install the runner
+            </a>
+          )}
           <button className="icon-btn" onClick={() => setDialog({ kind: 'settings' })} title="Settings (Ctrl+,)">
             <SettingsIcon size={17} />
           </button>

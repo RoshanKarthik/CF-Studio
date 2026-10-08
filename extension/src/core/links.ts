@@ -1,0 +1,2 @@
+/** GitHub Releases page with the zip (extension + `cfstudio-runner.exe`); linked where the runner is missing. */
+export const RELEASES_URL = 'https://github.com/OWNER/cf-studio/releases/latest';

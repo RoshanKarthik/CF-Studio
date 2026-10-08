@@ -8,12 +8,39 @@ Languages: C++20, Java 21, Python 3 / PyPy 3. Twelve themes (Monokai, Github, To
 Twilight, Dracula, Xcode, TextMate, Solarized Dark/Light, Terminal, Eclipse); the theme colours the
 whole workspace, not just the editor.
 
+## Install (download)
+
+Windows, Chrome / Edge / Brave. No Chrome Web Store needed.
+
+1. Download `cf-studio-<version>-windows.zip` from the
+   [Releases page](https://github.com/OWNER/cf-studio/releases/latest) and unzip it.
+2. Move the **CF Studio extension** folder somewhere it can stay (the browser loads it from there).
+3. Open `chrome://extensions` (`edge://extensions`, `brave://extensions`), turn on
+   **Developer mode**, click **Load unpacked** and pick the **CF Studio extension** folder.
+4. Optional, recommended: double-click `cfstudio-runner.exe`. It installs itself for your user
+   (`%LOCALAPPDATA%\Programs\CF Studio`), registers with Chrome, Edge and Brave and lists the
+   compilers it found on your PATH (g++ from MinGW-w64, a JDK, Python 3 / PyPy 3). Restart the
+   browser. Windows may warn about an unknown publisher: **More info → Run anyway**.
+
+Open any Codeforces problem and CF Studio opens on top of it. Without the runner, **Run** still
+works while you're logged in to Codeforces: each test goes to Codeforces' Custom Invocation
+(slower; stress tests, interactors and saving to disk need the runner). The top bar then shows an
+**Install the runner** link.
+
+**Updating:** download the new zip, replace the contents of your **CF Studio extension** folder,
+and click the reload icon on CF Studio's card in `chrome://extensions`; your code, templates and
+settings are kept (the extension ID never changes). Double-click the new `cfstudio-runner.exe`
+to update the runner.
+
+`INSTALL.txt` in the zip has the same steps.
+
 ## Layout
 
 ```
 extension/   Chrome extension (TypeScript, React, Vite, Monaco) — the IDE UI and Codeforces parsing
 runner/      Go native-messaging host that compiles and runs code with time/memory limits
 docs/        PLAN.md — decisions and build steps
+scripts/     release.ps1 — builds the download zip; INSTALL.txt goes in it
 ```
 
 ## Install the extension (development build)
@@ -104,6 +131,21 @@ npm run build      # type-check + build the extension into dist/
 The preview page uses a sample problem written in Codeforces' statement markup, a **simulated**
 runner (the first test passes, the rest fail, so every verdict view can be seen) and a simulated
 judge (a submission queues, runs a few tests and is accepted; nothing is sent to Codeforces).
+
+## Making a release
+
+Bump the version in `extension/package.json`, `extension/public/manifest.json` and `runner/host.go`
+(the script refuses to build if they differ), then:
+
+```bash
+powershell -ExecutionPolicy Bypass -File scripts/release.ps1
+```
+
+It does a fresh `npm run build`, builds the runner with `go build -trimpath -ldflags "-s -w"`, and
+writes `release/cf-studio-<version>-windows.zip` (the **CF Studio extension** folder, keeping the
+manifest `key`, plus `cfstudio-runner.exe` and `INSTALL.txt` from `scripts/INSTALL.txt`). Attach
+the zip to a GitHub release. The "Install the runner" links point to `RELEASES_URL` in
+`extension/src/core/links.ts`.
 
 ## Shortcuts
 

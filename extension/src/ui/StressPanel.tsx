@@ -1,7 +1,8 @@
-import { CheckCircle2, FilePlus2, Loader2, Play, Plus, Square, XCircle } from 'lucide-react';
+import { CheckCircle2, Download, FilePlus2, Loader2, Play, Plus, Square, XCircle } from 'lucide-react';
 import { useState } from 'react';
 import type { HelperKind } from '../core/helpers';
 import { HELPER_LABEL } from '../core/helpers';
+import { RELEASES_URL } from '../core/links';
 import type { StressOutcome } from '../core/stress';
 import { OutputBlock, ResultHeader } from './TestPanel';
 import type { StressState } from './useStress';
@@ -38,8 +39,13 @@ export function StressPanel({
   if (remote) {
     return (
       <div className="empty-state">
-        Stress testing runs thousands of tests, so it needs the CF Studio runner on this computer. Without it, Run uses
-        Codeforces' Custom Invocation, one test at a time.
+        <p>
+          Stress testing runs thousands of tests, so it needs the CF Studio runner on this computer. Without it, Run uses
+          Codeforces' Custom Invocation, one test at a time.
+        </p>
+        <a className="btn ghost" href={RELEASES_URL} target="_blank" rel="noopener noreferrer">
+          <Download size={14} /> Install the runner
+        </a>
       </div>
     );
   }

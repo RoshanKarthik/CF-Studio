@@ -4,3 +4,6 @@ runner/bin/
 
 # local tool config
 .claude/
+
+# release zips (scripts/release.ps1)
+release/

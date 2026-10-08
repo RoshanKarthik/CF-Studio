@@ -125,6 +125,20 @@ Competitive programming only. No hints, editorials, discussions or AI features.
    - Protocol read from the user's saved copy of the logged-in page (the built-in browser can't pass
      Codeforces' Cloudflare check); not yet run live — the verdict strings for errors are guessed
      and handled loosely (compile errors also recognised from the output text)
-7. **GitHub download** — next: release zip of the extension (unpacked install; the manifest `key`
-   keeps one extension ID for everyone) and the runner; double-clicking the runner installs it to
-   `%LOCALAPPDATA%\Programs\CF Studio` and lists the compilers found (done in the runner)
+7. **GitHub download** — done (no repository or release published yet)
+   - `scripts/release.ps1` (no new tools): checks that `package.json`, `manifest.json` and
+     `runner/host.go` agree on the version, does a fresh `npm run build`, builds the runner
+     (`GOOS=windows GOARCH=amd64`, `-trimpath -ldflags "-s -w"`) and checks it reports that
+     version, and writes `release/cf-studio-<version>-windows.zip`: `CF Studio extension/`
+     (= `extension/dist`; refuses to build without the manifest `key`, so every unpacked copy has
+     the ID the runner allows), `cfstudio-runner.exe`, `INSTALL.txt` (`scripts/INSTALL.txt`, CRLF).
+     Zipped with .NET's `ZipFile` and forward-slash entry names (PowerShell 5's `Compress-Archive`
+     writes backslashes)
+   - Double-clicking the runner installs it to `%LOCALAPPDATA%\Programs\CF Studio`, registers it
+     and lists the compilers found (already in the runner)
+   - Without the runner, an **Install the runner** link sits next to the amber status in the top
+     bar and in the Stress tab; both use `RELEASES_URL` (`src/core/links.ts`, the Releases page)
+   - README starts with a user-facing download install (load unpacked, double-click the runner,
+     update by replacing the folder and reloading); version 0.2.0
+   - Checked: the 0.2.0 zip's extension folder is identical to `dist`, its manifest has the key,
+     the runner prints 0.2.0; both links shown in the preview with a runner forced to "remote"

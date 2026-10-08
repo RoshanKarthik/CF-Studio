@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-const version = "0.1.0"
+const version = "0.2.0"
 
 // Output kept per test. The whole reply must fit Chrome's 1 MB message limit after JSON escaping.
 const (

@@ -226,6 +226,23 @@ button:disabled {
   box-shadow: 0 0 0 3px var(--warn-soft);
 }
 
+.install-link {
+  flex: none;
+  margin-right: 6px;
+  padding: 3px 9px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: 650;
+  white-space: nowrap;
+  color: var(--warn);
+  background: var(--warn-soft);
+  text-decoration: none;
+}
+
+.install-link:hover {
+  text-decoration: underline;
+}
+
 .runner-dot.bad .dot {
   background: var(--bad);
   box-shadow: 0 0 0 3px var(--bad-soft);
@@ -427,6 +444,7 @@ button:disabled {
   font-weight: 650;
   font-size: 13.5px;
   white-space: nowrap;
+  text-decoration: none;
   transition: background 0.15s, border-color 0.15s, box-shadow 0.15s, transform 0.06s;
 }
 

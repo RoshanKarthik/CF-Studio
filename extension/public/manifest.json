@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "CF Studio",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "A competitive-programming IDE on Codeforces problem pages: run the sample tests locally, submit when you're ready.",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAoJGXiqLwoA2HkfPHhCr2DevhFJn3a3C28Gds2edlqS24rDN8QWZhy96OEq8q175PzmybOIo8Eu4wGOocH3Y2G2xeaH/Xe0em14DVc+TpvWf35XUXBhZtwOPG3X80xIz3DUyU6uoam6M5K7f05hy7D7nDtBIOURgRCps/8/adWt1UYy+KHwZ7ad1A49eukHJ+MayF6mjUPKoLz1wQlOYWSIJw+7usfiB8kp4308mPIKDQ1dZDgZj4n1iOhXIFuMEAP1INHiPs2FVsRkt1LbRg2vB7IYPs2cNZPW2hdboxMOBS+foinsTUAKud8Uu1fi030h3tSa1SZWnc0COfF7JhQwIDAQAB",
   "icons": {

@@ -1,0 +1,38 @@
+CF Studio {version} - install
+==========================
+
+1. The extension (Chrome, Edge or Brave)
+
+   - Move the "CF Studio extension" folder somewhere it can stay, e.g. Documents\CF Studio.
+     The browser loads it from there, so don't delete it.
+   - Open chrome://extensions (edge://extensions, brave://extensions).
+   - Turn on "Developer mode" (top right in Chrome, left side in Edge).
+   - Click "Load unpacked" and pick the "CF Studio extension" folder.
+   - Open any Codeforces problem: CF Studio opens on top of it. Alt+I switches back.
+
+2. The runner (optional, recommended)
+
+   Double-click cfstudio-runner.exe. It copies itself to
+   %LOCALAPPDATA%\Programs\CF Studio, registers with Chrome, Edge and Brave, and lists the
+   compilers it found. Then restart the browser.
+
+   The runner uses the compilers on your PATH: g++ (MinGW-w64, e.g. from MSYS2),
+   a JDK (javac/java), Python 3 / PyPy 3. Install the ones you use, then run it again to check.
+
+   Windows may warn that the file is from an unknown publisher (it isn't signed):
+   "More info" -> "Run anyway".
+
+   Without the runner, Run still works: each test is sent to Codeforces' Custom Invocation
+   while you're logged in to Codeforces. It's slower, and stress tests, interactors and saving
+   solutions to disk need the runner.
+
+Updating
+
+   Download the new zip, replace the contents of your "CF Studio extension" folder with the new
+   one, and click the reload icon on CF Studio's card in chrome://extensions. Your code,
+   templates and settings are kept. Double-click the new cfstudio-runner.exe to update the runner.
+
+Uninstalling
+
+   Remove the extension in chrome://extensions. For the runner, run
+   "%LOCALAPPDATA%\Programs\CF Studio\cfstudio-runner.exe" uninstall, then delete that folder.
