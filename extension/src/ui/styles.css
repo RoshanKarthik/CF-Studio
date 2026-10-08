@@ -253,6 +253,16 @@ button:disabled {
   flex-direction: column;
 }
 
+/* Run and Submit, at the bottom right under the editor and tests. */
+.action-bar {
+  flex: none;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 2px 2px;
+}
+
 /* ================================================================ panes */
 
 .pane {

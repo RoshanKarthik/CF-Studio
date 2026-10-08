@@ -517,14 +517,6 @@ export function App({ problem, runner, kv, initial, judge: cf, onExit, nav, cont
             <span className="dot" />
             <span className="runner-text">{runnerStatus ? runnerStatus.detail : 'Checking runner…'}</span>
           </span>
-          <button className="btn run" onClick={() => void run()} disabled={running} title="Run all tests (Ctrl+')">
-            <Play size={15} className={running ? 'spin-slow' : ''} /> {running ? 'Running' : 'Run'}
-            <Kbd>Ctrl '</Kbd>
-          </button>
-          <button className="btn primary" onClick={() => setDialog({ kind: 'submit' })} title="Submit (Ctrl+Enter)">
-            <Send size={15} /> Submit
-          </button>
-          <span className="topbar-sep" />
           <button className="icon-btn" onClick={() => setDialog({ kind: 'settings' })} title="Settings (Ctrl+,)">
             <SettingsIcon size={17} />
           </button>
@@ -797,6 +789,17 @@ export function App({ problem, runner, kv, initial, judge: cf, onExit, nav, cont
               />
             </>
           )}
+
+          <div className="action-bar">
+            <button className="btn run" onClick={() => void run()} disabled={running} title="Run all tests (Ctrl+')">
+              <Play size={15} className={running ? 'spin-slow' : ''} /> {running ? 'Running' : 'Run'}
+              <Kbd>Ctrl '</Kbd>
+            </button>
+            <button className="btn primary" onClick={() => setDialog({ kind: 'submit' })} title="Submit (Ctrl+Enter)">
+              <Send size={15} /> Submit
+              <Kbd>Ctrl ↵</Kbd>
+            </button>
+          </div>
         </div>
       </div>
 

@@ -13,7 +13,7 @@ Competitive programming only. No hints, editorials, discussions or AI features.
 | UI | React 19 + Vite + TypeScript | Rich UI (panes, dialogs, template manager); official tooling |
 | Editor | Monaco, trimmed to C++/Java/Python (`src/editor/monaco.ts`) | VS Code's editor; full feature set without unused language services |
 | Formatting | clang-format (C++, Java) and Ruff (Python), compiled to WebAssembly | Runs in the browser, no installs; loaded on first use |
-| Look | Own design: command bar (timer, Run, Submit), file-tab editor header, underline tabs; colours derived from the chosen editor theme (`src/ui/themes.ts`), default Twilight | Original look; one setting controls the whole palette, light themes give a light IDE |
+| Look | Own design: command bar (timer, contest countdown, settings), Run and Submit at the bottom right under the tests, file-tab editor header, underline tabs; colours derived from the chosen editor theme (`src/ui/themes.ts`), default Twilight | Original look; one setting controls the whole palette, light themes give a light IDE |
 | Maths in statements | KaTeX, rendering Codeforces' `$$$...$$$` TeX | Fast, offline, matches the dark theme |
 | Runner | Go, talking to the extension over Chrome native messaging | Single small `.exe`; Windows Job Objects give real time *and* memory limits and kill whole process trees |
 | Storage | `KV` interface: localStorage in the preview, `chrome.storage.local` in the extension | UI code never depends on where data lives |
